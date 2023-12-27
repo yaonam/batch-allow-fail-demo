@@ -10,6 +10,8 @@ contract BytesErrorBitmapTest is Test {
     BytesErrorBitmap public bitmap;
     Callee public callee;
 
+    mapping(uint => uint) testStorage;
+
     function setUp() public {
         bitmap = new BytesErrorBitmap();
         callee = new Callee();
@@ -48,17 +50,103 @@ contract BytesErrorBitmapTest is Test {
         }
     }
 
-    function generateCounterBitmap(
-        bool[] calldata fails
-    ) public returns (bytes memory result) {}
+    function testFuzz_TwoLayers(bool[][] memory shouldFails) public {
+        uint firstLen = shouldFails.length;
+        if (firstLen > 10) firstLen = 10; // Limit
+        uint count = firstLen;
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](
+            firstLen
+        );
+        for (uint i; i < firstLen; i++) {
+            bool[] memory _shouldFails = shouldFails[i];
+            uint secondLen = _shouldFails.length;
+            if (secondLen > 10) secondLen = 10; // Limit
+            count += secondLen;
+            AllowFailedExecution[] memory _execs = new AllowFailedExecution[](
+                secondLen
+            );
+            for (uint j; j < secondLen; j++) {
+                _execs[j] = AllowFailedExecution(
+                    Execution(
+                        address(callee),
+                        0,
+                        abi.encodeWithSelector(
+                            Callee.ShouldFail.selector,
+                            _shouldFails[j]
+                        )
+                    ),
+                    true,
+                    Operation.Call
+                );
+            }
+            execs[i] = AllowFailedExecution(
+                Execution(
+                    address(bitmap),
+                    0,
+                    abi.encodeWithSelector(
+                        BytesErrorBitmap.batchExeAllowFail.selector,
+                        _execs
+                    )
+                ),
+                true,
+                Operation.Call
+            );
+        }
 
-    // function test_Increment() public {
-    //     counter.increment();
-    //     assertEq(counter.number(), 1);
-    // }
+        bytes memory result = bitmap.batchExeAllowFail(execs);
 
-    // function testFuzz_SetNumber(uint256 x) public {
-    //     counter.setNumber(x);
-    //     assertEq(counter.number(), x);
-    // }
+        assertEq(count % 256, uint(bytes32(result)));
+    }
+
+    function checkBitmap(
+        AllowFailedExecution[] calldata execs,
+        bool[] calldata fails,
+        bytes memory bits
+    ) public returns (bool reverted, bytes memory remainingBits) {
+        uint len = fails.length;
+        for (uint i; i < len; i++) {
+            bool bit;
+            assembly {
+                // load bitmap
+                bit := mload(add(bits, 0x40))
+                // shift bit of interest to leftmost
+                bit := shr(sub(255, i), bit)
+                // mask bit of interest
+                bit := and(
+                    0x0000000000000000000000000000000000000000000000000000000000000001,
+                    bit
+                )
+            }
+            assertEq(bit, fails[i]);
+
+            if (!bit && execs[i].allowFailed) {
+                assembly {
+                    // remainingBits :=
+                }
+            }
+        }
+    }
+
+    function checkBitmap(
+        AllowFailedExecution[][] calldata execs,
+        bool[][] calldata fails,
+        bytes memory bits
+    ) public returns (bool reverted) {
+        uint len = fails.length;
+        for (uint i; i < len; i++) {
+            bool bit;
+            assembly {
+                // load bitmap
+                bit := mload(add(bits, 0x40))
+                // shift bit of interest to leftmost
+                bit := shr(sub(255, i), bit)
+                // mask bit of interest
+                bit := and(
+                    0x0000000000000000000000000000000000000000000000000000000000000001,
+                    bit
+                )
+            }
+            // assertEq(bit, fails[i]);
+        }
+    }
 }
