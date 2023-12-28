@@ -30,19 +30,25 @@ use ethers::{
 };
 use ethers_solc::{Artifact, Project, ProjectPathsConfig};
 use eyre::Result;
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration, vec};
 
 // Generate the type-safe contract bindings by providing the ABI
-// definition in human readable format
 abigen!(
-    SimpleContract,
-    r#"[
-        function setValue(string)
-        function getValue() external view returns (string)
-        event ValueChanged(address indexed author, string oldValue, string newValue)
-    ]"#,
-    event_derives(serde::Deserialize, serde::Serialize)
+    BytesErrorBitmap,
+    "./out/BytesErrorBitmap.sol/BytesErrorBitmap.json"
 );
+// abigen!(
+//     Operation,
+//     "./out/BytesErrorBitmap.sol/BytesErrorBitmap.json"
+// );
+// abigen!(
+//     Execution,
+//     "./out/BytesErrorBitmap.sol/BytesErrorBitmap.json"
+// );
+// abigen!(
+//     AllowFailedExecution,
+//     "./out/BytesErrorBitmap.sol/BytesErrorBitmap.json"
+// );
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -95,23 +101,39 @@ async fn main() -> Result<()> {
     let addr = contract.address();
 
     // 8. instantiate the contract
-    let contract = SimpleContract::new(addr, client.clone());
+    let contract = BytesErrorBitmap::new(addr, client.clone());
+
+    // 8.5 build calldata
+    let exec = Execution {
+        target: addr,
+        value: 0.into(),
+        call_data: ethers::types::Bytes::new(),
+    };
+    let allow_fail_exec = AllowFailedExecution {
+        execution: exec,
+        allow_failed: false,
+        operation: 0,
+    };
 
     // 9. call the `setValue` method
     // (first `await` returns a PendingTransaction, second one waits for it to be mined)
-    let _receipt = contract.set_value("hi".to_owned()).send().await?.await?;
-
-    // 10. get all events
-    let logs = contract
-        .value_changed_filter()
-        .from_block(0u64)
-        .query()
+    let _receipt = contract
+        .batch_exe_allow_fail(vec![allow_fail_exec])
+        .send()
+        .await?
         .await?;
 
-    // 11. get the new value
-    let value = contract.get_value().call().await?;
+    // // 10. get all events
+    // let logs = contract
+    //     .value_changed_filter()
+    //     .from_block(0u64)
+    //     .query()
+    //     .await?;
 
-    println!("Value: {value}. Logs: {}", serde_json::to_string(&logs)?);
+    // // 11. get the new value
+    // let value = contract.get_value().call().await?;
+
+    // println!("Value: {value}. Logs: {}", serde_json::to_string(&logs)?);
 
     Ok(())
 }
