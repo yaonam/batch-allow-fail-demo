@@ -10,8 +10,6 @@ contract BytesErrorBitmapTest is Test {
     BytesErrorBitmap public bitmap;
     Callee public callee;
 
-    mapping(uint => uint) testStorage;
-
     function setUp() public {
         bitmap = new BytesErrorBitmap();
         callee = new Callee();
@@ -84,7 +82,7 @@ contract BytesErrorBitmapTest is Test {
                     address(bitmap),
                     0,
                     abi.encodeWithSelector(
-                        BytesErrorBitmap.batchExeAllowFail.selector,
+                        BytesErrorBitmap._batchExeAllowFail.selector,
                         _execs
                     )
                 ),

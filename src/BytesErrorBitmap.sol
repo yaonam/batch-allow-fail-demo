@@ -71,8 +71,9 @@ contract BytesErrorBitmap {
 
             // If batch, append bits to bitmap
             if (
+                aFE.execution.target == address(this) &&
                 bytes4(aFE.execution.callData) ==
-                this.batchExeAllowFail.selector
+                this._batchExeAllowFail.selector
             ) {
                 assembly {
                     let counterPos := add(counterBitMap, 0x20)
