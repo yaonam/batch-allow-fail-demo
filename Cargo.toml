@@ -6,14 +6,13 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ethers = "2.0.8" # TODO: Check if need ipc feature
-ethers-solc = "2.0.8"
+ethers = {version = "2.0.0", features = ["legacy"]} # Needs legacy for anvil
+ethers-solc = "2.0.0"
 eyre = "0.6.11"
-foundry-compilers = "0.1.1"
 serde = {veresion = "1.0.193", features = ["derive"]}
 serde_json = "1.0.108"
 tokio = {version = "1.35.1", features = ["macros"]}
 
 [[bin]]
-name = "utils"
+name = "bytes_error_bitmap"
 path = "main.rs"

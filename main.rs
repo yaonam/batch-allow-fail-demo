@@ -24,7 +24,7 @@ use ethers::{
     contract::{abigen, ContractFactory},
     core::utils::Anvil,
     middleware::SignerMiddleware,
-    providers::{Http, Provider},
+    providers::{Http, Middleware, Provider},
     signers::{LocalWallet, Signer},
     // solc::{Artifact, Project, ProjectPathsConfig},
 };
@@ -87,7 +87,9 @@ async fn main() -> Result<()> {
     let factory = ContractFactory::new(abi.unwrap(), bytecode.unwrap(), client.clone());
 
     // 6. deploy it with the constructor arguments
-    let contract = factory.deploy(())?.send().await?;
+    let deployment = factory.deploy(())?;
+    let sending = deployment.send();
+    let contract = sending.await?;
 
     // 7. get the contract's address
     let addr = contract.address();
