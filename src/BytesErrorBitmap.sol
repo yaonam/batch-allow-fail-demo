@@ -24,12 +24,22 @@ contract Callee {
 }
 
 contract BytesErrorBitmap {
+    event BitmapError(bytes bitmap);
+
+    function batchExeAllowFail(
+        AllowFailedExecution[] calldata allowFailExecs
+    ) external returns (bytes memory result) {
+        result = _batchExeAllowFail(allowFailExecs);
+
+        emit BitmapError(result);
+    }
+
     /**
      *
      * 0x00 - 0x20  counter
      * 0x20 - ....  bitmap
      */
-    function batchExeAllowFail(
+    function _batchExeAllowFail(
         AllowFailedExecution[] calldata allowFailExecs
     ) public returns (bytes memory) {
         uint execsLen = allowFailExecs.length;
