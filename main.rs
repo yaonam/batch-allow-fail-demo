@@ -25,7 +25,7 @@ enum ExecBoxed {
     Exec { exec: Exec },
 }
 
-fn getCalldata<T, U, V>(
+fn get_calldata<T, U, V>(
     callee_contract: ContractInstance<T, U>,
     callee_addr: H160,
     bitmap_contract: BytesErrorBitmap<V>,
@@ -38,7 +38,7 @@ where
         ExecBoxed::Exec {
             exec: Exec {
                 fail: false,
-                allow_fail: false,
+                allow_fail: true,
             },
         },
     )]))];
@@ -46,7 +46,7 @@ where
     println!("{}", serde_json::to_string_pretty(&execs).unwrap());
 
     // Encode the calldata
-    return encodeExecs(
+    return encode_execs(
         callee_contract.clone(),
         callee_addr,
         bitmap_contract.clone(),
@@ -54,7 +54,7 @@ where
     );
 }
 
-fn encodeExecs<T, U, V>(
+fn encode_execs<T, U, V>(
     callee_contract: ContractInstance<T, U>,
     callee_addr: H160,
     bitmap_contract: BytesErrorBitmap<V>,
@@ -69,12 +69,12 @@ where
         .map(|exec_boxed| match *exec_boxed {
             ExecBoxed::Execs(_execs) => AllowFailedExecution {
                 execution: Execution {
-                    target: callee_addr,
+                    target: bitmap_contract.address(),
                     value: 0.into(),
                     call_data: bitmap_contract
                         .encode(
-                            "batchExecAllowFail",
-                            (encodeExecs(
+                            "_batchExeAllowFail",
+                            (encode_execs(
                                 callee_contract.clone(),
                                 callee_addr,
                                 bitmap_contract.clone(),
@@ -83,7 +83,7 @@ where
                         )
                         .unwrap(),
                 },
-                allow_failed: false,
+                allow_failed: true,
                 operation: 0,
             },
             ExecBoxed::Exec { exec } => AllowFailedExecution {
@@ -104,6 +104,8 @@ abigen!(
     BytesErrorBitmap,
     "./out/BytesErrorBitmap.sol/BytesErrorBitmap.json",
     event_derives(serde::Deserialize, serde::Serialize);
+    Callee,
+    "./out/BytesErrorBitmap.sol/BytesErrorBitmap.json",
 );
 
 #[tokio::main]
@@ -169,29 +171,27 @@ async fn main() -> Result<()> {
     // 7. get the contract's address
     let callee_addr = callee_contract.address();
     let bitmap_addr = bitmap_contract.address();
+    println!("Deployed Callee to: {}", callee_addr);
+    println!("Deployed BytesErrorBitmap to: {}", bitmap_addr);
 
     // 8. instantiate the contract
-    // let callee_contract = Callee::new(callee_addr, client.clone());
+    Callee::new(callee_addr, client.clone());
     let bitmap_contract = BytesErrorBitmap::new(bitmap_addr, client.clone());
 
-    // 8.5 build calldata
-    let fail_data = callee_contract.encode("ShouldFail", (true,)).unwrap();
-    // let success_data = callee_contract.encode("ShouldFail", (false,)).unwrap();
-    // let exec = Execution {
-    //     target: callee_addr,
-    //     value: 0.into(),
-    //     call_data: success_data,
-    // };
-    // let allow_fail_exec = AllowFailedExecution {
-    //     execution: exec,
-    //     allow_failed: true,
-    //     operation: 0,
-    // };
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&get_calldata(
+            callee_contract.clone(),
+            callee_addr,
+            bitmap_contract.clone(),
+        ))
+        .unwrap()
+    );
 
     // 9. call the `setValue` method
     // (first `await` returns a PendingTransaction, second one waits for it to be mined)
     let _receipt = bitmap_contract
-        .batch_exe_allow_fail(getCalldata(
+        .batch_exe_allow_fail(get_calldata(
             callee_contract.clone(),
             callee_addr,
             bitmap_contract.clone(),
