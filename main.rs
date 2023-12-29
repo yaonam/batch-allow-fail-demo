@@ -1,16 +1,14 @@
 use ethers::{
-    contract::{abigen, ContractFactory, ContractInstance},
+    contract::{abigen, ContractFactory},
     core::utils::Anvil,
     middleware::SignerMiddleware,
-    providers::{Http, Middleware, Provider},
+    providers::{Http, Provider},
     signers::{LocalWallet, Signer},
-    types::H160,
-    // solc::{Artifact, Project, ProjectPathsConfig},
 };
 use ethers_solc::{Artifact, Project, ProjectPathsConfig};
 use eyre::Result;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, path::PathBuf, sync::Arc, time::Duration, vec};
+use std::{path::PathBuf, sync::Arc, time::Duration, vec};
 
 #[derive(Serialize, Deserialize)]
 struct Exec {
@@ -25,15 +23,11 @@ enum ExecBoxed {
     Exec { exec: Exec },
 }
 
-fn get_calldata<T, U, V>(
-    callee_contract: ContractInstance<T, U>,
-    callee_addr: H160,
-    bitmap_contract: BytesErrorBitmap<V>,
-) -> Vec<AllowFailedExecution>
-where
-    T: Borrow<U>,
-    T: Clone,
-{
+fn get_calldata<T>(
+    callee_contract: Callee<T>,
+    bitmap_contract: BytesErrorBitmap<T>,
+) -> Vec<AllowFailedExecution> {
+    // CREATE EXECUTION TREE HERE ----------------------------------------------
     let execs = vec![Box::new(ExecBoxed::Execs(vec![Box::new(
         ExecBoxed::Exec {
             exec: Exec {
@@ -46,24 +40,14 @@ where
     println!("{}", serde_json::to_string_pretty(&execs).unwrap());
 
     // Encode the calldata
-    return encode_execs(
-        callee_contract.clone(),
-        callee_addr,
-        bitmap_contract.clone(),
-        execs,
-    );
+    return encode_execs(callee_contract.clone(), bitmap_contract.clone(), execs);
 }
 
-fn encode_execs<T, U, V>(
-    callee_contract: ContractInstance<T, U>,
-    callee_addr: H160,
-    bitmap_contract: BytesErrorBitmap<V>,
+fn encode_execs<T>(
+    callee_contract: Callee<T>,
+    bitmap_contract: BytesErrorBitmap<T>,
     execs: Vec<Box<ExecBoxed>>,
-) -> Vec<AllowFailedExecution>
-where
-    T: Borrow<U>,
-    T: Clone,
-{
+) -> Vec<AllowFailedExecution> {
     execs
         .into_iter()
         .map(|exec_boxed| match *exec_boxed {
@@ -76,7 +60,6 @@ where
                             "_batchExeAllowFail",
                             (encode_execs(
                                 callee_contract.clone(),
-                                callee_addr,
                                 bitmap_contract.clone(),
                                 _execs,
                             ),),
@@ -88,9 +71,9 @@ where
             },
             ExecBoxed::Exec { exec } => AllowFailedExecution {
                 execution: Execution {
-                    target: callee_addr,
+                    target: callee_contract.address(),
                     value: 0.into(),
-                    call_data: callee_contract.encode("ShouldFail", (exec.fail,)).unwrap(),
+                    call_data: callee_contract.encode("foo", (exec.fail,)).unwrap(),
                 },
                 allow_failed: exec.allow_fail,
                 operation: 0,
@@ -105,7 +88,7 @@ abigen!(
     "./out/BytesErrorBitmap.sol/BytesErrorBitmap.json",
     event_derives(serde::Deserialize, serde::Serialize);
     Callee,
-    "./out/BytesErrorBitmap.sol/BytesErrorBitmap.json",
+    "./out/BytesErrorBitmap.sol/Callee.json",
 );
 
 #[tokio::main]
@@ -175,25 +158,14 @@ async fn main() -> Result<()> {
     println!("Deployed BytesErrorBitmap to: {}", bitmap_addr);
 
     // 8. instantiate the contract
-    Callee::new(callee_addr, client.clone());
+    let callee_contract = Callee::new(callee_addr, client.clone());
     let bitmap_contract = BytesErrorBitmap::new(bitmap_addr, client.clone());
-
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&get_calldata(
-            callee_contract.clone(),
-            callee_addr,
-            bitmap_contract.clone(),
-        ))
-        .unwrap()
-    );
 
     // 9. call the `setValue` method
     // (first `await` returns a PendingTransaction, second one waits for it to be mined)
     let _receipt = bitmap_contract
         .batch_exe_allow_fail(get_calldata(
             callee_contract.clone(),
-            callee_addr,
             bitmap_contract.clone(),
         ))
         .send()

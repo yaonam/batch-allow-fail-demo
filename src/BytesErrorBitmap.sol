@@ -18,7 +18,7 @@ struct AllowFailedExecution {
 }
 
 contract Callee {
-    function ShouldFail(bool shouldFail) external pure {
+    function foo(bool shouldFail) external pure {
         if (shouldFail) revert();
     }
 }
