@@ -31,24 +31,21 @@ enum ExecBoxed {
     Exec { exec: Exec },
 }
 
-fn get_calldata<T>(
-    callee_contract: Callee<T>,
-    bitmap_contract: BytesErrorBitmap<T>,
-) -> Vec<AllowFailedExecution> {
+fn get_exec_tree() -> Vec<Box<ExecBoxed>> {
     // CREATE EXECUTION TREE HERE ----------------------------------------------
     let execs = vec![Box::new(ExecBoxed::Batch {
         batch: Batch {
             execs: vec![
                 Box::new(ExecBoxed::Exec {
                     exec: Exec {
-                        fail: true,
+                        fail: false,
                         allow_fail: true,
                     },
                 }),
                 Box::new(ExecBoxed::Exec {
                     exec: Exec {
-                        fail: false,
-                        allow_fail: true,
+                        fail: true,
+                        allow_fail: false,
                     },
                 }),
             ],
@@ -56,11 +53,18 @@ fn get_calldata<T>(
         },
     })];
 
+    return execs;
+}
+
+fn get_calldata<T>(
+    callee_contract: Callee<T>,
+    bitmap_contract: BytesErrorBitmap<T>,
+) -> Vec<AllowFailedExecution> {
+    let execs = get_exec_tree();
     println!(
         "Execution tree: {}",
         serde_json::to_string_pretty(&execs).unwrap()
     );
-
     // Encode the calldata
     return encode_execs(callee_contract.clone(), bitmap_contract.clone(), execs);
 }
@@ -217,26 +221,11 @@ async fn main() -> Result<()> {
     println!("Bitmap: {}", bitmap);
 
     // Decode the bitmap
-    let (execs, _) = decode_bitmap(
-        vec![Box::new(ExecBoxed::Batch {
-            batch: Batch {
-                execs: vec![Box::new(ExecBoxed::Exec {
-                    exec: Exec {
-                        fail: true,
-                        allow_fail: true,
-                    },
-                })],
-                allow_fail: true,
-            },
-        })],
-        counter,
-        bitmap,
-        0,
-    );
+    let (execs_results, _) = decode_bitmap(get_exec_tree(), counter, bitmap, 0);
 
     println!(
         "Decoded execution tree: {}",
-        serde_json::to_string_pretty(&execs).unwrap()
+        serde_json::to_string_pretty(&execs_results).unwrap()
     );
 
     Ok(())
@@ -269,51 +258,77 @@ fn decode_bitmap(
     bitmap: U256,
     i: u8,
 ) -> (Vec<Box<ExecResultBoxed>>, u8) {
+    // println!("execs: {}", serde_json::to_string_pretty(&execs).unwrap());
     let mut _i: u8 = i;
     let mut reverted: bool = false;
-    let _execs = execs
+    let mut _execs: Vec<Box<ExecResultBoxed>> = execs
         .into_iter()
         .map(|exec_boxed| match *exec_boxed {
+            // If batch, recurse
             ExecBoxed::Batch { batch } => Box::new(ExecResultBoxed::BatchResult {
                 batch_result: {
                     let __execs: Vec<Box<ExecResultBoxed>>;
                     (__execs, _i) = decode_bitmap(batch.execs, counter, bitmap, _i);
                     let failed = bitmap.bit((255 - _i).into());
-                    reverted = reverted || (failed && !batch.allow_fail);
+                    reverted = reverted || (failed && !batch.allow_fail) || _i == counter;
                     let res = BatchResult {
                         execs: __execs,
                         allow_fail: batch.allow_fail,
-                        failed: failed,
+                        failed: failed || reverted, // if reverted, set rest to fail
                     };
                     if !reverted {
-                        _i += 1;
+                        _i += 1; // if reverted, don't increment
                     };
                     res
                 },
             }),
             ExecBoxed::Exec { exec } => Box::new(ExecResultBoxed::ExecResult {
                 exec_result: {
+                    let failed = bitmap.bit((255 - _i).into());
+                    reverted = reverted || (failed && !exec.allow_fail) || _i == counter;
                     let res = ExecResult {
-                        fail: bitmap.bit(i.into()),
+                        fail: exec.fail,
                         allow_fail: exec.allow_fail,
-                        failed: bitmap.bit((255 - i).into()),
+                        failed: failed || reverted, // if reverted, set rest to fail
                     };
                     if !reverted {
-                        _i += 1;
+                        _i += 1; // if reverted, don't increment
                     };
                     res
                 },
             }),
         })
         .collect();
-    return (_execs, _i);
-
-    // if batch, recurse
-    // if batch revert, set rest to fail (don't increment)
-    // set current execution result
-    // return results and incremented counter
-
-    // if i == counter, set all to fail
 
     // if reverted, iterate all and set to fail
+    if reverted {
+        _execs = set_failed(_execs);
+    }
+
+    return (_execs, _i);
+}
+
+fn set_failed(results: Vec<Box<ExecResultBoxed>>) -> Vec<Box<ExecResultBoxed>> {
+    println!("called");
+    return results
+        .into_iter()
+        .map(|exec_result_boxed| match *exec_result_boxed {
+            ExecResultBoxed::BatchResult { batch_result } => {
+                Box::new(ExecResultBoxed::BatchResult {
+                    batch_result: BatchResult {
+                        execs: set_failed(batch_result.execs),
+                        allow_fail: batch_result.allow_fail,
+                        failed: true,
+                    },
+                })
+            }
+            ExecResultBoxed::ExecResult { exec_result } => Box::new(ExecResultBoxed::ExecResult {
+                exec_result: ExecResult {
+                    fail: exec_result.fail,
+                    allow_fail: exec_result.allow_fail,
+                    failed: true,
+                },
+            }),
+        })
+        .collect();
 }
