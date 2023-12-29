@@ -17,9 +17,15 @@ struct Exec {
 }
 
 #[derive(Serialize, Deserialize)]
+struct Batch {
+    execs: Vec<Box<ExecBoxed>>,
+    allow_fail: bool,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 enum ExecBoxed {
-    Execs(Vec<Box<ExecBoxed>>),
+    Batch { batch: Batch },
     Exec { exec: Exec },
 }
 
@@ -28,14 +34,17 @@ fn get_calldata<T>(
     bitmap_contract: BytesErrorBitmap<T>,
 ) -> Vec<AllowFailedExecution> {
     // CREATE EXECUTION TREE HERE ----------------------------------------------
-    let execs = vec![Box::new(ExecBoxed::Execs(vec![Box::new(
-        ExecBoxed::Exec {
-            exec: Exec {
-                fail: false,
-                allow_fail: true,
-            },
+    let execs = vec![Box::new(ExecBoxed::Batch {
+        batch: Batch {
+            execs: vec![Box::new(ExecBoxed::Exec {
+                exec: Exec {
+                    fail: false,
+                    allow_fail: true,
+                },
+            })],
+            allow_fail: true,
         },
-    )]))];
+    })];
 
     println!("{}", serde_json::to_string_pretty(&execs).unwrap());
 
@@ -51,7 +60,7 @@ fn encode_execs<T>(
     execs
         .into_iter()
         .map(|exec_boxed| match *exec_boxed {
-            ExecBoxed::Execs(_execs) => AllowFailedExecution {
+            ExecBoxed::Batch { batch } => AllowFailedExecution {
                 execution: Execution {
                     target: bitmap_contract.address(),
                     value: 0.into(),
@@ -61,12 +70,12 @@ fn encode_execs<T>(
                             (encode_execs(
                                 callee_contract.clone(),
                                 bitmap_contract.clone(),
-                                _execs,
+                                batch.execs,
                             ),),
                         )
                         .unwrap(),
                 },
-                allow_failed: true,
+                allow_failed: batch.allow_fail,
                 operation: 0,
             },
             ExecBoxed::Exec { exec } => AllowFailedExecution {
