@@ -49,6 +49,12 @@ fn get_exec_tree() -> Vec<Box<ExecBoxed>> {
                             allow_fail: false,
                         },
                     }),
+                    Box::new(ExecBoxed::Exec {
+                        exec: Exec {
+                            fail: true,
+                            allow_fail: false,
+                        },
+                    }),
                 ],
                 allow_fail: true,
             },
@@ -65,7 +71,7 @@ fn get_exec_tree() -> Vec<Box<ExecBoxed>> {
                     Box::new(ExecBoxed::Exec {
                         exec: Exec {
                             fail: true,
-                            allow_fail: false,
+                            allow_fail: true,
                         },
                     }),
                 ],
@@ -253,24 +259,31 @@ async fn main() -> Result<()> {
 }
 
 #[derive(Serialize, Deserialize)]
-struct ExecResult {
-    fail: bool,
-    allow_fail: bool,
-    failed: bool,
+enum ExecResult {
+    Success,
+    Failure,
+    Skipped,
 }
 
 #[derive(Serialize, Deserialize)]
-struct BatchResult {
-    execs: Vec<Box<ExecResultBoxed>>,
+struct ExecWithResult {
+    fail: bool,
     allow_fail: bool,
-    failed: bool,
+    exec_result: ExecResult,
+}
+
+#[derive(Serialize, Deserialize)]
+struct BatchWithResult {
+    execs: Vec<Box<BoxedWithResult>>,
+    allow_fail: bool,
+    exec_result: ExecResult,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
-enum ExecResultBoxed {
-    BatchResult { batch_result: BatchResult },
-    ExecResult { exec_result: ExecResult },
+enum BoxedWithResult {
+    BatchResult { batch_result: BatchWithResult },
+    ExecResult { exec_result: ExecWithResult },
 }
 
 fn decode_bitmap(
@@ -278,42 +291,66 @@ fn decode_bitmap(
     counter: u8,
     bitmap: U256,
     i: u8,
-) -> (Vec<Box<ExecResultBoxed>>, u8) {
+) -> (Vec<Box<BoxedWithResult>>, u8) {
     // println!("execs: {}", serde_json::to_string_pretty(&execs).unwrap());
     let mut _i: u8 = i;
     let mut reverted: bool = false;
-    let mut _execs: Vec<Box<ExecResultBoxed>> = execs
+    let mut _execs: Vec<Box<BoxedWithResult>> = execs
         .into_iter()
         .map(|exec_boxed| match *exec_boxed {
             // If batch, recurse
-            ExecBoxed::Batch { batch } => Box::new(ExecResultBoxed::BatchResult {
+            ExecBoxed::Batch { batch } => Box::new(BoxedWithResult::BatchResult {
                 batch_result: {
-                    let __execs: Vec<Box<ExecResultBoxed>>;
+                    let __execs: Vec<Box<BoxedWithResult>>;
                     (__execs, _i) = decode_bitmap(batch.execs, counter, bitmap, _i);
                     let failed = bitmap.bit((255 - _i).into()) || _i == counter;
+                    let skip = reverted;
                     if !reverted {
                         _i += 1; // if reverted, don't increment
                     };
                     reverted = reverted || (failed && !batch.allow_fail);
-                    let res = BatchResult {
+                    let res = BatchWithResult {
                         execs: __execs,
                         allow_fail: batch.allow_fail,
-                        failed: failed || reverted, // if reverted, set rest to fail
+                        exec_result: {
+                            if reverted && !skip {
+                                // Exec that caused revert
+                                ExecResult::Failure
+                            } else if reverted {
+                                ExecResult::Skipped
+                            } else if failed {
+                                ExecResult::Failure
+                            } else {
+                                ExecResult::Success
+                            }
+                        }, // if reverted, set rest to skipped
                     };
                     res
                 },
             }),
-            ExecBoxed::Exec { exec } => Box::new(ExecResultBoxed::ExecResult {
+            ExecBoxed::Exec { exec } => Box::new(BoxedWithResult::ExecResult {
                 exec_result: {
                     let failed = bitmap.bit((255 - _i).into()) || _i == counter;
                     if !reverted {
                         _i += 1; // if reverted, don't increment
                     };
+                    let skip = reverted;
                     reverted = reverted || (failed && !exec.allow_fail);
-                    let res = ExecResult {
+                    let res = ExecWithResult {
                         fail: exec.fail,
                         allow_fail: exec.allow_fail,
-                        failed: failed || reverted, // if reverted, set rest to fail
+                        exec_result: {
+                            if reverted && !skip {
+                                // Exec that caused revert
+                                ExecResult::Failure
+                            } else if reverted {
+                                ExecResult::Skipped
+                            } else if failed {
+                                ExecResult::Failure
+                            } else {
+                                ExecResult::Success
+                            }
+                        }, // if reverted, set rest to fail
                     };
                     res
                 },
@@ -331,24 +368,34 @@ fn decode_bitmap(
     return (_execs, _i);
 }
 
-fn set_failed(results: Vec<Box<ExecResultBoxed>>) -> Vec<Box<ExecResultBoxed>> {
+fn set_failed(results: Vec<Box<BoxedWithResult>>) -> Vec<Box<BoxedWithResult>> {
     return results
         .into_iter()
         .map(|exec_result_boxed| match *exec_result_boxed {
-            ExecResultBoxed::BatchResult { batch_result } => {
-                Box::new(ExecResultBoxed::BatchResult {
-                    batch_result: BatchResult {
+            BoxedWithResult::BatchResult { batch_result } => {
+                Box::new(BoxedWithResult::BatchResult {
+                    batch_result: BatchWithResult {
                         execs: set_failed(batch_result.execs),
                         allow_fail: batch_result.allow_fail,
-                        failed: true,
+                        exec_result: {
+                            match batch_result.exec_result {
+                                ExecResult::Skipped => ExecResult::Skipped,
+                                _ => ExecResult::Failure,
+                            }
+                        },
                     },
                 })
             }
-            ExecResultBoxed::ExecResult { exec_result } => Box::new(ExecResultBoxed::ExecResult {
-                exec_result: ExecResult {
+            BoxedWithResult::ExecResult { exec_result } => Box::new(BoxedWithResult::ExecResult {
+                exec_result: ExecWithResult {
                     fail: exec_result.fail,
                     allow_fail: exec_result.allow_fail,
-                    failed: true,
+                    exec_result: {
+                        match exec_result.exec_result {
+                            ExecResult::Skipped => ExecResult::Skipped,
+                            _ => ExecResult::Failure,
+                        }
+                    },
                 },
             }),
         })
