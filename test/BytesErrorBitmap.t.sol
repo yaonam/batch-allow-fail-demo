@@ -22,10 +22,7 @@ contract BytesErrorBitmapTest is Test {
             Execution memory exec = Execution(
                 address(callee),
                 0,
-                abi.encodeWithSelector(
-                    Callee.ShouldFail.selector,
-                    shouldFails[i]
-                )
+                abi.encodeWithSelector(Callee.foo.selector, shouldFails[i])
             );
             execs[i] = AllowFailedExecution(exec, true, Operation.Call);
         }
@@ -69,7 +66,7 @@ contract BytesErrorBitmapTest is Test {
                         address(callee),
                         0,
                         abi.encodeWithSelector(
-                            Callee.ShouldFail.selector,
+                            Callee.foo.selector,
                             _shouldFails[j]
                         )
                     ),
