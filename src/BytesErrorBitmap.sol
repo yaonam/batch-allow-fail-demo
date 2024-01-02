@@ -79,55 +79,71 @@ contract BytesErrorBitmap {
                     let counterPos := add(counterBitMap, 0x20)
                     let counter := mload(counterPos)
 
-                    let aLen := add(mload(appendee), 0x20)
+                    let aCounter := mload(add(appendee, 0x20))
 
+                    // Append bitmap
                     for {
-                        let j := 0x40 // Need to skip over counter
-                    } lt(j, aLen) {
+                        let j := 0x40 // Skip over len + counter
+                    } lt(j, add(0x60, mul(div(counter, 256), 0x20))) {
+                        // TODO: Break above down
                         j := add(j, 0x20)
                     } {
-                        // Get length
-                        let len := mload(counterBitMap)
-
-                        switch counter
+                        let nextSlot := add(counterBitMap, 0x40) // Skip len and counter
+                        if gt(mod(counter, 256), 0) {
+                            nextSlot := add(nextSlot, 0x20) // Skip last slot
+                        }
+                        nextSlot := add(nextSlot, mul(div(counter, 256), 0x20))
+                        switch mod(counter, 256)
                         case 0 {
                             // Add entire chunk
-                            // Go to empty byte
-                            let newPos := add(counterPos, len)
                             // Write slot
-                            mstore(newPos, mload(add(appendee, j)))
+                            mstore(nextSlot, mload(add(appendee, j)))
                             // Increment counterBitMap length
-                            mstore(counterBitMap, add(len, 0x20))
+                            mstore(
+                                counterBitMap,
+                                add(mload(counterBitMap), 0x20)
+                            )
+                            // TODO: Shift reasons and increment counterBitMap length
                         }
                         default {
                             // Mask and add first part to last slot
-                            // Go to last slot
-                            let lastPos := sub(add(counterBitMap, len), 0x00)
                             // Create mask
                             let mask := shr(counter, mload(add(appendee, j)))
                             // Mask last slot
-                            mstore(lastPos, or(mload(lastPos), mask))
-
+                            mstore(nextSlot, or(mload(nextSlot), mask))
                             // Mask and add remaining part to new slot
+                            // TODO: Shift reasons and increment counterBitMap length
                             // Go to new slot
-                            let newPos := add(counterPos, len)
+                            let newPos := add(nextSlot, 0x20)
                             // Create mask
                             mask := shl(
                                 sub(256, counter),
                                 mload(add(appendee, j))
                             )
                             // Write new slot
-                            mstore(newPos, mask)
+                            mstore(nextSlot, mask)
                         }
-
                         // Update counter
-                        counter := add(counter, mload(add(appendee, 0x20)))
-                        if gt(counter, 255) {
-                            counter := sub(counter, 256)
-                            // Increment counterBitMap length
-                            mstore(counterBitMap, add(len, 0x20))
-                        }
+                        counter := add(counter, aCounter)
                         mstore(counterPos, counter)
+                    }
+
+                    // Append reasons
+                    let nextSlot := add(counterBitMap, 0x40) // Skip len and counter
+                    if gt(mod(counter, 256), 0) {
+                        nextSlot := add(nextSlot, 0x20) // Skip last slot
+                    }
+                    nextSlot := add(nextSlot, mul(div(counter, 256), 0x20))
+                    for {
+                        let j := 0x60 // Skip over len, counter, bitmap 1st slot
+                        j := add(j, mul(div(aCounter, 256), 0x20)) // Skip rest of bitmap
+                    } lt(j, add(0x80, mul(div(aCounter, 256), 0x20))) {
+                        j := add(j, 0x20)
+                    } {
+                        // Increment counterBitMap length
+                        mstore(counterBitMap, add(mload(counterBitMap), 0x20))
+                        // Write slot
+                        mstore(nextSlot, mload(add(appendee, j)))
                     }
                 }
             }
@@ -155,9 +171,8 @@ contract BytesErrorBitmap {
                 }
                 default {
                     // Add 1 to bitmap
-                    // Go to empty byte
-                    let nextPos := add(counterBitMap, 0x40) // Skip len, counter, new slot
-                    nextPos := add(nextPos, div(counter, 256))
+                    let nextPos := add(counterBitMap, 0x40) // Skip len and counter
+                    nextPos := add(nextPos, mul(div(counter, 256), 0x20))
 
                     switch mod(counter, 256)
                     case 0 {

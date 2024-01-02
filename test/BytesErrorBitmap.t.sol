@@ -15,7 +15,7 @@ contract BytesErrorBitmapTest is Test {
         callee = new Callee();
     }
 
-    function test_success() public {
+    function test_Success() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
         execs[0] = AllowFailedExecution(
             Execution(
@@ -33,7 +33,7 @@ contract BytesErrorBitmapTest is Test {
         );
     }
 
-    function test_fail() public {
+    function test_Fail() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
         execs[0] = AllowFailedExecution(
             Execution(
@@ -52,7 +52,7 @@ contract BytesErrorBitmapTest is Test {
         );
     }
 
-    function test_fail2() public {
+    function test_SuccessFail() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](2);
         execs[0] = AllowFailedExecution(
             Execution(
@@ -77,6 +77,75 @@ contract BytesErrorBitmapTest is Test {
         assertEq(
             result,
             hex"0000000000000000000000000000000000000000000000000000000000000002c00000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+        );
+    }
+
+    function test_FailSuccessFail() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](3);
+        execs[0] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
+        execs[1] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, false)
+            ),
+            true,
+            Operation.Call
+        );
+        execs[2] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
+        bytes memory result = bitmap.batchExeAllowFail(execs);
+
+        assertEq(
+            result,
+            hex"0000000000000000000000000000000000000000000000000000000000000003a00000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+        );
+    }
+
+    function test_successNested() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
+        AllowFailedExecution[] memory _execs = new AllowFailedExecution[](1);
+        _execs[0] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
+        execs[0] = AllowFailedExecution(
+            Execution(
+                address(bitmap),
+                0,
+                abi.encodeWithSelector(
+                    BytesErrorBitmap._batchExeAllowFail.selector,
+                    _execs
+                )
+            ),
+            false,
+            Operation.Call
+        );
+        bytes memory result = bitmap.batchExeAllowFail(execs);
+
+        assertEq(
+            result,
+            hex"0000000000000000000000000000000000000000000000000000000000000002800000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
         );
     }
 
@@ -167,7 +236,7 @@ contract BytesErrorBitmapTest is Test {
 
     //     bytes memory result = bitmap.batchExeAllowFail(execs);
 
-    //     assertEq(count % 256, uint(bytes32(result)));
+    //     assertEq(count, uint(bytes32(result)));
     // }
 
     function checkBitmap(
