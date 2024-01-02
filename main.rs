@@ -74,6 +74,12 @@ fn get_exec_tree() -> Vec<Box<ExecBoxed>> {
                             allow_fail: true,
                         },
                     }),
+                    Box::new(ExecBoxed::Exec {
+                        exec: Exec {
+                            fail: false,
+                            allow_fail: true,
+                        },
+                    }),
                 ],
                 allow_fail: true,
             },
@@ -361,8 +367,8 @@ fn decode_bitmap(
 
     // if reverted, iterate all and set to fail
     if reverted {
-        println!("reverted, i: {}", _i);
-        println!("execs: {}", serde_json::to_string_pretty(&_execs).unwrap());
+        // println!("reverted, i: {}", _i);
+        // println!("execs: {}", serde_json::to_string_pretty(&_execs).unwrap());
         _execs = set_failed(_execs);
     }
 
