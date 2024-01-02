@@ -262,6 +262,7 @@ async fn main() -> Result<()> {
 enum ExecResult {
     Success,
     Failure,
+    SuccessButReverted,
     Skipped,
 }
 
@@ -380,6 +381,7 @@ fn set_failed(results: Vec<Box<BoxedWithResult>>) -> Vec<Box<BoxedWithResult>> {
                         exec_result: {
                             match batch_result.exec_result {
                                 ExecResult::Skipped => ExecResult::Skipped,
+                                ExecResult::Success => ExecResult::SuccessButReverted,
                                 _ => ExecResult::Failure,
                             }
                         },
@@ -393,6 +395,7 @@ fn set_failed(results: Vec<Box<BoxedWithResult>>) -> Vec<Box<BoxedWithResult>> {
                     exec_result: {
                         match exec_result.exec_result {
                             ExecResult::Skipped => ExecResult::Skipped,
+                            ExecResult::Success => ExecResult::SuccessButReverted,
                             _ => ExecResult::Failure,
                         }
                     },
