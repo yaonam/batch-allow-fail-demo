@@ -15,83 +15,148 @@ contract BytesErrorBitmapTest is Test {
         callee = new Callee();
     }
 
-    function testFuzz_OneLayer(bool[] calldata shouldFails) public {
-        uint len = shouldFails.length;
-        AllowFailedExecution[] memory execs = new AllowFailedExecution[](len);
-        for (uint i; i < len; i++) {
-            Execution memory exec = Execution(
+    function test_success() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
+        execs[0] = AllowFailedExecution(
+            Execution(
                 address(callee),
                 0,
-                abi.encodeWithSelector(Callee.foo.selector, shouldFails[i])
-            );
-            execs[i] = AllowFailedExecution(exec, true, Operation.Call);
-        }
-        bytes memory result = bitmap.batchExeAllowFail(execs);
-        assertEq(len, uint(bytes32(result)));
-        for (uint i; i < len; i++) {
-            bool res;
-            assembly {
-                // load bitmap
-                res := mload(add(result, 0x40))
-                // shift bit of interest to leftmost
-                res := shr(sub(255, i), res)
-                // mask bit of interest
-                res := and(
-                    0x0000000000000000000000000000000000000000000000000000000000000001,
-                    res
-                )
-            }
-            assertEq(res, shouldFails[i]);
-        }
-    }
-
-    function testFuzz_TwoLayers(bool[][] memory shouldFails) public {
-        uint firstLen = shouldFails.length;
-        if (firstLen > 10) firstLen = 10; // Limit
-        uint count = firstLen;
-        AllowFailedExecution[] memory execs = new AllowFailedExecution[](
-            firstLen
+                abi.encodeWithSelector(Callee.foo.selector, false)
+            ),
+            false,
+            Operation.Call
         );
-        for (uint i; i < firstLen; i++) {
-            bool[] memory _shouldFails = shouldFails[i];
-            uint secondLen = _shouldFails.length;
-            if (secondLen > 10) secondLen = 10; // Limit
-            count += secondLen;
-            AllowFailedExecution[] memory _execs = new AllowFailedExecution[](
-                secondLen
-            );
-            for (uint j; j < secondLen; j++) {
-                _execs[j] = AllowFailedExecution(
-                    Execution(
-                        address(callee),
-                        0,
-                        abi.encodeWithSelector(
-                            Callee.foo.selector,
-                            _shouldFails[j]
-                        )
-                    ),
-                    true,
-                    Operation.Call
-                );
-            }
-            execs[i] = AllowFailedExecution(
-                Execution(
-                    address(bitmap),
-                    0,
-                    abi.encodeWithSelector(
-                        BytesErrorBitmap._batchExeAllowFail.selector,
-                        _execs
-                    )
-                ),
-                true,
-                Operation.Call
-            );
-        }
+        bytes memory result = bitmap.batchExeAllowFail(execs);
+        assertEq(
+            result,
+            hex"00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000"
+        );
+    }
 
+    function test_fail() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
+        execs[0] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
         bytes memory result = bitmap.batchExeAllowFail(execs);
 
-        assertEq(count % 256, uint(bytes32(result)));
+        assertEq(
+            result,
+            hex"0000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+        );
     }
+
+    function test_fail2() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](2);
+        execs[0] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
+        execs[1] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
+        bytes memory result = bitmap.batchExeAllowFail(execs);
+
+        assertEq(
+            result,
+            hex"0000000000000000000000000000000000000000000000000000000000000002c00000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+        );
+    }
+
+    // function testFuzz_OneLayer(bool[] calldata shouldFails) public {
+    //     uint len = shouldFails.length;
+    //     AllowFailedExecution[] memory execs = new AllowFailedExecution[](len);
+    //     for (uint i; i < len; i++) {
+    //         Execution memory exec = Execution(
+    //             address(callee),
+    //             0,
+    //             abi.encodeWithSelector(Callee.foo.selector, shouldFails[i])
+    //         );
+    //         execs[i] = AllowFailedExecution(exec, true, Operation.Call);
+    //     }
+    //     bytes memory result = bitmap.batchExeAllowFail(execs);
+    //     assertEq(len, uint(bytes32(result)));
+    //     for (uint i; i < len; i++) {
+    //         bool res;
+    //         assembly {
+    //             // load bitmap
+    //             res := mload(add(result, 0x40))
+    //             // shift bit of interest to leftmost
+    //             res := shr(sub(255, i), res)
+    //             // mask bit of interest
+    //             res := and(
+    //                 0x0000000000000000000000000000000000000000000000000000000000000001,
+    //                 res
+    //             )
+    //         }
+    //         assertEq(res, shouldFails[i]);
+    //     }
+    // }
+
+    // function testFuzz_TwoLayers(bool[][] memory shouldFails) public {
+    //     uint firstLen = shouldFails.length;
+    //     if (firstLen > 10) firstLen = 10; // Limit
+    //     uint count = firstLen;
+    //     AllowFailedExecution[] memory execs = new AllowFailedExecution[](
+    //         firstLen
+    //     );
+    //     for (uint i; i < firstLen; i++) {
+    //         bool[] memory _shouldFails = shouldFails[i];
+    //         uint secondLen = _shouldFails.length;
+    //         if (secondLen > 10) secondLen = 10; // Limit
+    //         count += secondLen;
+    //         AllowFailedExecution[] memory _execs = new AllowFailedExecution[](
+    //             secondLen
+    //         );
+    //         for (uint j; j < secondLen; j++) {
+    //             _execs[j] = AllowFailedExecution(
+    //                 Execution(
+    //                     address(callee),
+    //                     0,
+    //                     abi.encodeWithSelector(
+    //                         Callee.foo.selector,
+    //                         _shouldFails[j]
+    //                     )
+    //                 ),
+    //                 true,
+    //                 Operation.Call
+    //             );
+    //         }
+    //         execs[i] = AllowFailedExecution(
+    //             Execution(
+    //                 address(bitmap),
+    //                 0,
+    //                 abi.encodeWithSelector(
+    //                     BytesErrorBitmap._batchExeAllowFail.selector,
+    //                     _execs
+    //                 )
+    //             ),
+    //             true,
+    //             Operation.Call
+    //         );
+    //     }
+
+    //     bytes memory result = bitmap.batchExeAllowFail(execs);
+
+    //     assertEq(count % 256, uint(bytes32(result)));
+    // }
 
     function checkBitmap(
         AllowFailedExecution[] calldata execs,

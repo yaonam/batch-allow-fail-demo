@@ -19,7 +19,7 @@ struct AllowFailedExecution {
 
 contract Callee {
     function foo(bool shouldFail) external pure {
-        if (shouldFail) revert();
+        if (shouldFail) revert("revert reason");
     }
 }
 
@@ -36,8 +36,8 @@ contract BytesErrorBitmap {
 
     /**
      *
-     * 0x00 - 0x20  counter
-     * 0x20 - ....  bitmap
+     * 0x00 - 0x20  bitmap length
+     * 0x20 - ....  bitmap + reasons
      */
     function _batchExeAllowFail(
         AllowFailedExecution[] calldata allowFailExecs
@@ -141,7 +141,7 @@ contract BytesErrorBitmap {
                 case true {
                     // Add 0 to bitmap
                     // Check if need allocate memory
-                    if eq(counter, 0) {
+                    if eq(mod(counter, 256), 0) {
                         // Increment 0x40 memory pointer
                         mstore(0x40, add(mload(0x40), 0x20))
                         // Increment bitmap length
@@ -152,59 +152,53 @@ contract BytesErrorBitmap {
                             0x0000000000000000000000000000000000000000000000000000000000000000
                         )
                     }
-
-                    // Increment counter
-                    switch counter
-                    case 255 {
-                        mstore(counterPos, 0)
-                    }
-                    default {
-                        mstore(counterPos, add(counter, 1))
-                    }
                 }
                 default {
                     // Add 1 to bitmap
-                    switch counter
+                    switch mod(counter, 256)
                     case 0 {
                         // Increment 0x40 memory pointer
                         mstore(0x40, add(mload(0x40), 0x20))
 
-                        // Get length
-                        let len := mload(counterBitMap)
                         // Go to empty byte
-                        let newPos := add(counterPos, len)
+                        let newPos := add(counterBitMap, 0x40) // Skip len, counter, new slot
+                        newPos := add(newPos, div(counter, 256))
                         // Write 1 to leftmost bit
                         mstore(newPos, shl(255, 1))
                         // Increment counterBitMap length
-                        mstore(counterBitMap, add(len, 0x20))
+                        mstore(counterBitMap, add(mload(counterBitMap), 0x20))
 
                         // Set counter to 1
                         mstore(counterPos, 0x01)
                     }
                     default {
-                        // Get length
-                        let len := mload(counterBitMap)
                         // Go to last slot
-                        let lastPos := add(counterBitMap, len)
+                        let lastPos := add(counterBitMap, 0x40) // Skip len and counter
+                        lastPos := add(lastPos, div(counter, 256))
                         // Create mask
                         let mask := shl(sub(255, counter), 1)
                         // Mask using OR
                         mstore(lastPos, or(mload(lastPos), mask))
-
-                        // Update counter
-                        switch counter
-                        case 255 {
-                            mstore(counterPos, 0)
-                        }
-                        default {
-                            mstore(counterPos, add(counter, 1))
-                        }
                     }
+
+                    // Append reason, should be next slot
+                    // Will overwrite appendee, so no need to allocate memory
+                    // Get length
+                    let len := mload(counterBitMap)
+                    // Go to empty byte
+                    let newPos := add(add(counterBitMap, len), 0x20)
+                    // Write slot
+                    mstore(newPos, mload(add(appendee, 0x64)))
+                    // Increment counterBitMap length
+                    mstore(counterBitMap, add(len, 0x20))
 
                     if shouldRevert {
                         revert(add(counterBitMap, 0x20), mload(counterBitMap))
                     }
                 }
+
+                // Increment counter
+                mstore(counterPos, add(counter, 1))
             }
         }
 
