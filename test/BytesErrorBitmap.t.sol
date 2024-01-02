@@ -52,7 +52,7 @@ contract BytesErrorBitmapTest is Test {
         );
     }
 
-    function test_SuccessFail() public {
+    function test_FailFail() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](2);
         execs[0] = AllowFailedExecution(
             Execution(
@@ -114,6 +114,84 @@ contract BytesErrorBitmapTest is Test {
         assertEq(
             result,
             hex"0000000000000000000000000000000000000000000000000000000000000003a00000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+        );
+    }
+
+    function test_FailSuccessOverflowSuccess() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](257);
+        execs[0] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
+        for (uint i = 1; i < 256; i++) {
+            execs[i] = AllowFailedExecution(
+                Execution(
+                    address(callee),
+                    0,
+                    abi.encodeWithSelector(Callee.foo.selector, false)
+                ),
+                true,
+                Operation.Call
+            );
+        }
+        execs[256] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, false)
+            ),
+            true,
+            Operation.Call
+        );
+        bytes memory result = bitmap.batchExeAllowFail(execs);
+
+        assertEq(
+            result,
+            hex"00000000000000000000000000000000000000000000000000000000000001018000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+        );
+    }
+
+    function test_FailSuccessOverflowFail() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](257);
+        execs[0] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
+        for (uint i = 1; i < 256; i++) {
+            execs[i] = AllowFailedExecution(
+                Execution(
+                    address(callee),
+                    0,
+                    abi.encodeWithSelector(Callee.foo.selector, false)
+                ),
+                true,
+                Operation.Call
+            );
+        }
+        execs[256] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, false)
+            ),
+            true,
+            Operation.Call
+        );
+        bytes memory result = bitmap.batchExeAllowFail(execs);
+
+        assertEq(
+            result,
+            hex"00000000000000000000000000000000000000000000000000000000000001018000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
         );
     }
 

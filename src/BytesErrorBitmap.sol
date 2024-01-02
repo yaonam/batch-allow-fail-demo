@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import {console2} from "forge-std/Test.sol";
+
 enum Operation {
     Call,
     DelegateCall
@@ -149,6 +151,7 @@ contract BytesErrorBitmap {
             }
 
             // Add this tx's bit to bitmap
+            bytes32 logger;
             assembly {
                 let counterPos := add(counterBitMap, 0x20)
                 let counter := mload(counterPos)
@@ -162,9 +165,29 @@ contract BytesErrorBitmap {
                         mstore(0x40, add(mload(0x40), 0x20))
                         // Increment bitmap length
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
+                        // TODO: Shift reasons and increment counterBitMap length
+                        if gt(
+                            mload(counterBitMap),
+                            add(0x40, mul(div(counter, 256), 0x20))
+                        ) {
+                            // Loop and shift each reason back one slot
+                            for {
+                                let j := mload(counterBitMap)
+                            } gt(j, add(0x40, mul(div(counter, 256), 0x20))) {
+                                j := sub(j, 0x20)
+                            } {
+                                mstore(
+                                    add(counterBitMap, j),
+                                    mload(add(counterBitMap, sub(j, 0x20)))
+                                )
+                            }
+                        }
                         // Clear slot?
                         mstore(
-                            add(counterBitMap, mload(counterBitMap)),
+                            add(
+                                counterBitMap,
+                                add(0x40, mul(div(counter, 256), 0x20))
+                            ),
                             0x0000000000000000000000000000000000000000000000000000000000000000
                         )
                     }
@@ -180,6 +203,26 @@ contract BytesErrorBitmap {
                         mstore(0x40, add(mload(0x40), 0x20))
                         // Increment counterBitMap length
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
+
+                        // TODO: Shift reasons and increment counterBitMap length
+                        if gt(
+                            mload(counterBitMap),
+                            add(0x20, mul(div(counter, 256), 0x20))
+                        ) {
+                            // revert(0, 0)
+                            // Loop and shift each reason back one slot
+                            for {
+                                let j := mload(counterBitMap)
+                            } gt(j, add(0x20, mul(div(counter, 256), 0x20))) {
+                                j := sub(j, 0x20)
+                            } {
+                                mstore(
+                                    add(counterBitMap, j),
+                                    mload(add(counterBitMap, sub(j, 0x20)))
+                                )
+                            }
+                        }
+
                         // Write 1 to leftmost bit
                         mstore(nextPos, shl(255, 1))
                     }
