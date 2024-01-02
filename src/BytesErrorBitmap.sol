@@ -155,30 +155,24 @@ contract BytesErrorBitmap {
                 }
                 default {
                     // Add 1 to bitmap
+                    // Go to empty byte
+                    let nextPos := add(counterBitMap, 0x40) // Skip len, counter, new slot
+                    nextPos := add(nextPos, div(counter, 256))
+
                     switch mod(counter, 256)
                     case 0 {
                         // Increment 0x40 memory pointer
                         mstore(0x40, add(mload(0x40), 0x20))
-
-                        // Go to empty byte
-                        let newPos := add(counterBitMap, 0x40) // Skip len, counter, new slot
-                        newPos := add(newPos, div(counter, 256))
-                        // Write 1 to leftmost bit
-                        mstore(newPos, shl(255, 1))
                         // Increment counterBitMap length
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
-
-                        // Set counter to 1
-                        mstore(counterPos, 0x01)
+                        // Write 1 to leftmost bit
+                        mstore(nextPos, shl(255, 1))
                     }
                     default {
-                        // Go to last slot
-                        let lastPos := add(counterBitMap, 0x40) // Skip len and counter
-                        lastPos := add(lastPos, div(counter, 256))
                         // Create mask
                         let mask := shl(sub(255, counter), 1)
                         // Mask using OR
-                        mstore(lastPos, or(mload(lastPos), mask))
+                        mstore(nextPos, or(mload(nextPos), mask))
                     }
 
                     // Append reason, should be next slot
