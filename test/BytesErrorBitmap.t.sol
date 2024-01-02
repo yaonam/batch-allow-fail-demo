@@ -80,35 +80,47 @@ contract BytesErrorBitmapTest is Test {
         );
     }
 
-    // function testFuzz_OneLayer(bool[] calldata shouldFails) public {
-    //     uint len = shouldFails.length;
-    //     AllowFailedExecution[] memory execs = new AllowFailedExecution[](len);
-    //     for (uint i; i < len; i++) {
-    //         Execution memory exec = Execution(
-    //             address(callee),
-    //             0,
-    //             abi.encodeWithSelector(Callee.foo.selector, shouldFails[i])
-    //         );
-    //         execs[i] = AllowFailedExecution(exec, true, Operation.Call);
-    //     }
-    //     bytes memory result = bitmap.batchExeAllowFail(execs);
-    //     assertEq(len, uint(bytes32(result)));
-    //     for (uint i; i < len; i++) {
-    //         bool res;
-    //         assembly {
-    //             // load bitmap
-    //             res := mload(add(result, 0x40))
-    //             // shift bit of interest to leftmost
-    //             res := shr(sub(255, i), res)
-    //             // mask bit of interest
-    //             res := and(
-    //                 0x0000000000000000000000000000000000000000000000000000000000000001,
-    //                 res
-    //             )
-    //         }
-    //         assertEq(res, shouldFails[i]);
-    //     }
-    // }
+    function testFuzz_OneLayer(bool[] calldata shouldFails) public {
+        uint len = shouldFails.length;
+        uint expectLen = len > 0 ? 2 : 1;
+        expectLen += len / 256;
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](len);
+        for (uint i; i < len; i++) {
+            Execution memory exec = Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, shouldFails[i])
+            );
+            execs[i] = AllowFailedExecution(exec, true, Operation.Call);
+            if (shouldFails[i]) {
+                expectLen++;
+            }
+        }
+        bytes memory result = bitmap.batchExeAllowFail(execs);
+        // Check counter
+        bytes32 counter;
+        assembly {
+            counter := mload(add(result, 0x20))
+        }
+        assertEq(uint(counter), len);
+        // Check total length
+        assertEq(result.length, expectLen * 32);
+        for (uint i; i < len; i++) {
+            bool res;
+            assembly {
+                // load bitmap
+                res := mload(add(result, 0x40))
+                // shift bit of interest to leftmost
+                res := shr(sub(255, i), res)
+                // mask bit of interest
+                res := and(
+                    0x0000000000000000000000000000000000000000000000000000000000000001,
+                    res
+                )
+            }
+            assertEq(res, shouldFails[i]);
+        }
+    }
 
     // function testFuzz_TwoLayers(bool[][] memory shouldFails) public {
     //     uint firstLen = shouldFails.length;
