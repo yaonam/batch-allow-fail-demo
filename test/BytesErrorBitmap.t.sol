@@ -195,7 +195,7 @@ contract BytesErrorBitmapTest is Test {
         );
     }
 
-    function test_successNested() public {
+    function test_FailNested() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
         AllowFailedExecution[] memory _execs = new AllowFailedExecution[](1);
         _execs[0] = AllowFailedExecution(
@@ -224,6 +224,47 @@ contract BytesErrorBitmapTest is Test {
         assertEq(
             result,
             hex"0000000000000000000000000000000000000000000000000000000000000002800000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+        );
+    }
+
+    function test_FailFailNested() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
+        AllowFailedExecution[] memory _execs = new AllowFailedExecution[](2);
+        _execs[0] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
+        _execs[1] = AllowFailedExecution(
+            Execution(
+                address(callee),
+                0,
+                abi.encodeWithSelector(Callee.foo.selector, true)
+            ),
+            true,
+            Operation.Call
+        );
+        execs[0] = AllowFailedExecution(
+            Execution(
+                address(bitmap),
+                0,
+                abi.encodeWithSelector(
+                    BytesErrorBitmap._batchExeAllowFail.selector,
+                    _execs
+                )
+            ),
+            false,
+            Operation.Call
+        );
+        bytes memory result = bitmap.batchExeAllowFail(execs);
+
+        assertEq(
+            result,
+            hex"0000000000000000000000000000000000000000000000000000000000000003c00000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
         );
     }
 
@@ -281,6 +322,18 @@ contract BytesErrorBitmapTest is Test {
             bool[] memory _shouldFails = shouldFails[i];
             uint secondLen = _shouldFails.length;
             if (secondLen > 10) secondLen = 10; // Limit
+            if (secondLen == 0) {
+                execs[i] = AllowFailedExecution(
+                    Execution(
+                        address(callee),
+                        0,
+                        abi.encodeWithSelector(Callee.foo.selector, false)
+                    ),
+                    true,
+                    Operation.Call
+                );
+                continue;
+            }
             count += secondLen;
             AllowFailedExecution[] memory _execs = new AllowFailedExecution[](
                 secondLen
@@ -319,7 +372,7 @@ contract BytesErrorBitmapTest is Test {
         bytes memory result = bitmap.batchExeAllowFail(execs);
 
         // Check counter
-        assertEq(count, uint(bytes32(result)));
+        assertEq(uint(bytes32(result)), count);
 
         // Check total length
         uint expectLen = count > 0 ? 2 : 1;

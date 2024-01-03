@@ -80,6 +80,7 @@ contract BytesErrorBitmap {
                     let counter := mload(counterPos)
 
                     let aCounter := mload(add(appendee, 0x20))
+                    let aLen := mload(appendee)
 
                     // Append bitmap
                     for {
@@ -129,21 +130,19 @@ contract BytesErrorBitmap {
                     }
 
                     // Append reasons
-                    let nextSlot := add(counterBitMap, 0x40) // Skip len and counter
-                    if gt(mod(counter, 256), 0) {
-                        nextSlot := add(nextSlot, 0x20) // Skip last slot
-                    }
-                    nextSlot := add(nextSlot, mul(div(counter, 256), 0x20))
                     for {
-                        let j := 0x60 // Skip over len, counter, bitmap 1st slot
-                        j := add(j, mul(div(aCounter, 256), 0x20)) // Skip rest of bitmap
-                    } lt(j, add(0x80, mul(div(aCounter, 256), 0x20))) {
+                        let j := 0x60 // Skip over len + counter + bitmap 1st slot
+                        j := add(j, mul(div(aCounter, 256), 0x20)) // Skip over rest bitmap
+                    } lt(j, add(aLen, 0x20)) {
                         j := add(j, 0x20)
                     } {
                         // Increment counterBitMap length
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
                         // Write slot
-                        mstore(nextSlot, mload(add(appendee, j)))
+                        mstore(
+                            add(mload(counterBitMap), counterBitMap),
+                            mload(add(appendee, j))
+                        )
                     }
                 }
             }
