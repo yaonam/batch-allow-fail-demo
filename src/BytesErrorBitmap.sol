@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {console2} from "forge-std/Test.sol";
-
 enum Operation {
     Call,
     DelegateCall
@@ -44,12 +42,12 @@ contract BytesErrorBitmap {
     function _batchExeAllowFail(
         AllowFailedExecution[] calldata allowFailExecs
     ) public returns (bytes memory) {
-        uint execsLen = allowFailExecs.length;
+        uint256 execsLen = allowFailExecs.length;
         bool shouldRevert;
         bool success;
         bytes
             memory counterBitMap = hex"0000000000000000000000000000000000000000000000000000000000000000";
-        for (uint i; i < execsLen; ++i) {
+        for (uint256 i; i < execsLen; ++i) {
             AllowFailedExecution calldata aFE = allowFailExecs[i];
             shouldRevert = !aFE.allowFailed;
             success = false;
@@ -151,7 +149,6 @@ contract BytesErrorBitmap {
             }
 
             // Add this tx's bit to bitmap
-            bytes32 logger;
             assembly {
                 let counterPos := add(counterBitMap, 0x20)
                 let counter := mload(counterPos)
@@ -195,7 +192,6 @@ contract BytesErrorBitmap {
                 default {
                     // Add 1 to bitmap
                     let nextPos := add(counterBitMap, 0x40) // Skip len and counter
-                    nextPos := add(nextPos, mul(div(counter, 256), 0x20))
 
                     switch mod(counter, 256)
                     case 0 {
@@ -205,15 +201,12 @@ contract BytesErrorBitmap {
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
 
                         // TODO: Shift reasons and increment counterBitMap length
-                        if gt(
-                            mload(counterBitMap),
-                            add(0x20, mul(div(counter, 256), 0x20))
-                        ) {
-                            // revert(0, 0)
+                        let emptyLen := add(0x20, mul(div(counter, 256), 0x20))
+                        if gt(mload(counterBitMap), emptyLen) {
                             // Loop and shift each reason back one slot
                             for {
                                 let j := mload(counterBitMap)
-                            } gt(j, add(0x20, mul(div(counter, 256), 0x20))) {
+                            } gt(j, emptyLen) {
                                 j := sub(j, 0x20)
                             } {
                                 mstore(

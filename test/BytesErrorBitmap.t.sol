@@ -182,7 +182,7 @@ contract BytesErrorBitmapTest is Test {
             Execution(
                 address(callee),
                 0,
-                abi.encodeWithSelector(Callee.foo.selector, false)
+                abi.encodeWithSelector(Callee.foo.selector, true)
             ),
             true,
             Operation.Call
@@ -269,53 +269,64 @@ contract BytesErrorBitmapTest is Test {
         }
     }
 
-    // function testFuzz_TwoLayers(bool[][] memory shouldFails) public {
-    //     uint firstLen = shouldFails.length;
-    //     if (firstLen > 10) firstLen = 10; // Limit
-    //     uint count = firstLen;
-    //     AllowFailedExecution[] memory execs = new AllowFailedExecution[](
-    //         firstLen
-    //     );
-    //     for (uint i; i < firstLen; i++) {
-    //         bool[] memory _shouldFails = shouldFails[i];
-    //         uint secondLen = _shouldFails.length;
-    //         if (secondLen > 10) secondLen = 10; // Limit
-    //         count += secondLen;
-    //         AllowFailedExecution[] memory _execs = new AllowFailedExecution[](
-    //             secondLen
-    //         );
-    //         for (uint j; j < secondLen; j++) {
-    //             _execs[j] = AllowFailedExecution(
-    //                 Execution(
-    //                     address(callee),
-    //                     0,
-    //                     abi.encodeWithSelector(
-    //                         Callee.foo.selector,
-    //                         _shouldFails[j]
-    //                     )
-    //                 ),
-    //                 true,
-    //                 Operation.Call
-    //             );
-    //         }
-    //         execs[i] = AllowFailedExecution(
-    //             Execution(
-    //                 address(bitmap),
-    //                 0,
-    //                 abi.encodeWithSelector(
-    //                     BytesErrorBitmap._batchExeAllowFail.selector,
-    //                     _execs
-    //                 )
-    //             ),
-    //             true,
-    //             Operation.Call
-    //         );
-    //     }
+    function testFuzz_TwoLayers(bool[][] memory shouldFails) public {
+        uint firstLen = shouldFails.length;
+        if (firstLen > 10) firstLen = 10; // Limit
+        uint count = firstLen;
+        uint failCount;
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](
+            firstLen
+        );
+        for (uint i; i < firstLen; i++) {
+            bool[] memory _shouldFails = shouldFails[i];
+            uint secondLen = _shouldFails.length;
+            if (secondLen > 10) secondLen = 10; // Limit
+            count += secondLen;
+            AllowFailedExecution[] memory _execs = new AllowFailedExecution[](
+                secondLen
+            );
+            for (uint j; j < secondLen; j++) {
+                _execs[j] = AllowFailedExecution(
+                    Execution(
+                        address(callee),
+                        0,
+                        abi.encodeWithSelector(
+                            Callee.foo.selector,
+                            _shouldFails[j]
+                        )
+                    ),
+                    true,
+                    Operation.Call
+                );
+                if (_shouldFails[j]) {
+                    failCount++;
+                }
+            }
+            execs[i] = AllowFailedExecution(
+                Execution(
+                    address(bitmap),
+                    0,
+                    abi.encodeWithSelector(
+                        BytesErrorBitmap._batchExeAllowFail.selector,
+                        _execs
+                    )
+                ),
+                true,
+                Operation.Call
+            );
+        }
 
-    //     bytes memory result = bitmap.batchExeAllowFail(execs);
+        bytes memory result = bitmap.batchExeAllowFail(execs);
 
-    //     assertEq(count, uint(bytes32(result)));
-    // }
+        // Check counter
+        assertEq(count, uint(bytes32(result)));
+
+        // Check total length
+        uint expectLen = count > 0 ? 2 : 1;
+        expectLen += count / 256;
+        expectLen += failCount;
+        assertEq(result.length, expectLen * 32);
+    }
 
     function checkBitmap(
         AllowFailedExecution[] calldata execs,
