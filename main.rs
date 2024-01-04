@@ -34,31 +34,31 @@ enum ExecBoxed {
 fn get_exec_tree() -> Vec<Box<ExecBoxed>> {
     // CREATE EXECUTION TREE HERE ----------------------------------------------
     let execs = vec![
-        Box::new(ExecBoxed::Batch {
-            batch: Batch {
-                execs: vec![
-                    Box::new(ExecBoxed::Exec {
-                        exec: Exec {
-                            fail: false,
-                            allow_fail: true,
-                        },
-                    }),
-                    Box::new(ExecBoxed::Exec {
-                        exec: Exec {
-                            fail: true,
-                            allow_fail: false,
-                        },
-                    }),
-                    Box::new(ExecBoxed::Exec {
-                        exec: Exec {
-                            fail: true,
-                            allow_fail: false,
-                        },
-                    }),
-                ],
-                allow_fail: true,
-            },
-        }),
+        // Box::new(ExecBoxed::Batch {
+        //     batch: Batch {
+        //         execs: vec![
+        //             Box::new(ExecBoxed::Exec {
+        //                 exec: Exec {
+        //                     fail: false,
+        //                     allow_fail: true,
+        //                 },
+        //             }),
+        //             Box::new(ExecBoxed::Exec {
+        //                 exec: Exec {
+        //                     fail: true,
+        //                     allow_fail: false,
+        //                 },
+        //             }),
+        //             Box::new(ExecBoxed::Exec {
+        //                 exec: Exec {
+        //                     fail: true,
+        //                     allow_fail: false,
+        //                 },
+        //             }),
+        //         ],
+        //         allow_fail: true,
+        //     },
+        // }),
         Box::new(ExecBoxed::Batch {
             batch: Batch {
                 execs: vec![
@@ -247,15 +247,15 @@ async fn main() -> Result<()> {
     // Convert counter and bitmap to u128
     let counter: String = hex::encode(&logs[0].bitmap)[0..64].to_string();
     let counter = u16::from_str_radix(&counter, 16)?;
-    let bitmap_end = (96 + counter / 256 * 32) as usize;
+    let bitmap_end = (128 + counter / 256 * 32) as usize;
     let bitmap: String = hex::encode(&logs[0].bitmap)[64..bitmap_end].to_string();
-    let bitmap = U256::from_str_radix(&bitmap, 16)?;
+    let bitmap_num = U256::from_str_radix(&bitmap, 16)?;
 
     println!("Counter: {}", counter);
     println!("Bitmap: {}", bitmap);
 
     // Decode the bitmap
-    let (execs_results, _) = decode_bitmap(get_exec_tree(), counter, bitmap, 0);
+    let (execs_results, _) = decode_bitmap(get_exec_tree(), counter, bitmap_num, 0);
 
     println!(
         "Decoded execution tree: {}",

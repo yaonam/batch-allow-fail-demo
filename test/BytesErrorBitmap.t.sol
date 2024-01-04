@@ -198,51 +198,51 @@ contract BytesErrorBitmapTest is Test {
         );
     }
 
-    // function test_BatchesNested() public {
-    //     AllowFailedExecution[] memory execs = new AllowFailedExecution[](2);
-    //     AllowFailedExecution[] memory execs1 = new AllowFailedExecution[](3);
-    //     AllowFailedExecution[] memory execs2 = new AllowFailedExecution[](3);
+    function test_BatchesNested() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](2);
+        AllowFailedExecution[] memory execs1 = new AllowFailedExecution[](3);
+        AllowFailedExecution[] memory execs2 = new AllowFailedExecution[](3);
 
-    //     execs1[0] = AllowFailedExecution(execSuccess, true, Operation.Call);
-    //     execs1[1] = AllowFailedExecution(execFail, false, Operation.Call);
-    //     execs1[2] = AllowFailedExecution(execFail, false, Operation.Call);
+        execs1[0] = AllowFailedExecution(execSuccess, true, Operation.Call);
+        execs1[1] = AllowFailedExecution(execFail, false, Operation.Call);
+        execs1[2] = AllowFailedExecution(execFail, false, Operation.Call);
 
-    //     execs2[0] = AllowFailedExecution(execSuccess, false, Operation.Call);
-    //     execs2[1] = AllowFailedExecution(execFail, true, Operation.Call);
-    //     execs2[2] = AllowFailedExecution(execSuccess, true, Operation.Call);
+        execs2[0] = AllowFailedExecution(execSuccess, false, Operation.Call);
+        execs2[1] = AllowFailedExecution(execFail, true, Operation.Call);
+        execs2[2] = AllowFailedExecution(execSuccess, true, Operation.Call);
 
-    //     execs[0] = AllowFailedExecution(
-    //         Execution(
-    //             address(bitmap),
-    //             0,
-    //             abi.encodeWithSelector(
-    //                 BytesErrorBitmap._batchExeAllowFail.selector,
-    //                 execs1
-    //             )
-    //         ),
-    //         true,
-    //         Operation.Call
-    //     );
-    //     execs[1] = AllowFailedExecution(
-    //         Execution(
-    //             address(bitmap),
-    //             0,
-    //             abi.encodeWithSelector(
-    //                 BytesErrorBitmap._batchExeAllowFail.selector,
-    //                 execs2
-    //             )
-    //         ),
-    //         true,
-    //         Operation.Call
-    //     );
+        execs[0] = AllowFailedExecution(
+            Execution(
+                address(bitmap),
+                0,
+                abi.encodeWithSelector(
+                    BytesErrorBitmap._batchExeAllowFail.selector,
+                    execs1
+                )
+            ),
+            true,
+            Operation.Call
+        );
+        execs[1] = AllowFailedExecution(
+            Execution(
+                address(bitmap),
+                0,
+                abi.encodeWithSelector(
+                    BytesErrorBitmap._batchExeAllowFail.selector,
+                    execs2
+                )
+            ),
+            true,
+            Operation.Call
+        );
 
-    //     bytes memory result = bitmap.batchExeAllowFail(execs);
+        bytes memory result = bitmap.batchExeAllowFail(execs);
 
-    //     assertEq(
-    //         result,
-    //         hex"0000000000000000000000000000000000000000000000000000000000000006480000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
-    //     );
-    // }
+        assertEq(
+            result,
+            hex"0000000000000000000000000000000000000000000000000000000000000007680000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+        );
+    }
 
     function testFuzz_OneLayer(bool[] calldata shouldFails) public {
         uint len = shouldFails.length;
