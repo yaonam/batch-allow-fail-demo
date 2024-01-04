@@ -244,18 +244,20 @@ async fn main() -> Result<()> {
     // Get the bitmap
     println!("Emitted bitmap: {}", logs[0].bitmap);
 
-    // Convert counter and bitmap to u128
+    // Convert counter and bitmap
     let counter: String = hex::encode(&logs[0].bitmap)[0..64].to_string();
     let counter = u16::from_str_radix(&counter, 16)?;
     let bitmap_end = (128 + counter / 256 * 32) as usize;
     let bitmap: String = hex::encode(&logs[0].bitmap)[64..bitmap_end].to_string();
     let bitmap_num = U256::from_str_radix(&bitmap, 16)?;
+    let reasons: String = hex::encode(&logs[0].bitmap)[bitmap_end..].to_string();
 
     println!("Counter: {}", counter);
     println!("Bitmap: {}", bitmap);
+    println!("Num of reasons: {}", reasons.len() / 64);
 
     // Decode the bitmap
-    let (execs_results, _) = decode_bitmap(get_exec_tree(), counter, bitmap_num, 0);
+    let (execs_results, _, __) = decode_bitmap(get_exec_tree(), counter, bitmap_num, reasons, 0);
 
     println!(
         "Decoded execution tree: {}",
@@ -278,6 +280,7 @@ struct ExecWithResult {
     fail: bool,
     allow_fail: bool,
     exec_result: ExecResult,
+    revert_reason: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -298,8 +301,9 @@ fn decode_bitmap(
     execs: Vec<Box<ExecBoxed>>,
     counter: u16,
     bitmap: U256,
+    mut reasons: String,
     i: u16,
-) -> (Vec<Box<BoxedWithResult>>, u16) {
+) -> (Vec<Box<BoxedWithResult>>, String, u16) {
     // println!("execs: {}", serde_json::to_string_pretty(&execs).unwrap());
     let mut _i: u16 = i;
     let mut reverted: bool = false;
@@ -310,7 +314,8 @@ fn decode_bitmap(
             ExecBoxed::Batch { batch } => Box::new(BoxedWithResult::BatchResult {
                 batch_result: {
                     let __execs: Vec<Box<BoxedWithResult>>;
-                    (__execs, _i) = decode_bitmap(batch.execs, counter, bitmap, _i);
+                    (__execs, reasons, _i) =
+                        decode_bitmap(batch.execs, counter, bitmap, reasons.clone(), _i);
                     let failed = bitmap.bit((255 - _i).into()) || _i == counter;
                     let skip = reverted;
                     if !reverted {
@@ -359,6 +364,18 @@ fn decode_bitmap(
                                 ExecResult::Success
                             }
                         }, // if reverted, set rest to fail
+                        revert_reason: {
+                            if (reverted && !skip) || (!reverted && failed) {
+                                println!("hallo");
+                                // Exec that caused revert
+                                let mut chars: Vec<char> = reasons.chars().collect();
+                                let reason: Vec<char> = chars.drain(..64).collect();
+                                reasons = chars.into_iter().collect();
+                                reason.into_iter().collect()
+                            } else {
+                                "".to_string()
+                            }
+                        },
                     };
                     res
                 },
@@ -373,7 +390,7 @@ fn decode_bitmap(
         _execs = set_failed(_execs);
     }
 
-    return (_execs, _i);
+    return (_execs, reasons, _i);
 }
 
 fn set_failed(results: Vec<Box<BoxedWithResult>>) -> Vec<Box<BoxedWithResult>> {
@@ -406,6 +423,7 @@ fn set_failed(results: Vec<Box<BoxedWithResult>>) -> Vec<Box<BoxedWithResult>> {
                             _ => ExecResult::Failure,
                         }
                     },
+                    revert_reason: exec_result.revert_reason,
                 },
             }),
         })
