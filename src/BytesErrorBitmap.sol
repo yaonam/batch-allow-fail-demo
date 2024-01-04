@@ -57,12 +57,14 @@ contract BytesErrorBitmap {
         uint256 execsLen = allowFailExecs.length;
         bool shouldRevert;
         bool success;
+        bool isBatch;
         bytes
             memory counterBitMap = hex"0000000000000000000000000000000000000000000000000000000000000000";
         for (uint256 i; i < execsLen; ++i) {
             AllowFailedExecution calldata aFE = allowFailExecs[i];
             shouldRevert = !aFE.allowFailed;
             success = false;
+            isBatch = false;
             bytes memory appendee;
             try
                 this.exe(
@@ -87,7 +89,10 @@ contract BytesErrorBitmap {
                 bytes4(aFE.execution.callData) ==
                 this._batchExeAllowFail.selector
             ) {
-                assembly {
+                isBatch = true;
+            }
+            assembly {
+                if isBatch {
                     let counterPos := add(counterBitMap, 0x20)
                     let counter := mload(counterPos)
 
@@ -253,16 +258,18 @@ contract BytesErrorBitmap {
                         mstore(nextPos, or(mload(nextPos), mask))
                     }
 
-                    // Append reason, should be next slot
-                    // Will overwrite appendee, so no need to allocate memory
-                    // Get length
-                    let len := mload(counterBitMap)
-                    // Go to empty byte
-                    let newPos := add(add(counterBitMap, len), 0x20)
-                    // Write slot
-                    mstore(newPos, mload(add(appendee, 0x64)))
-                    // Increment counterBitMap length
-                    mstore(counterBitMap, add(len, 0x20))
+                    if not(isBatch) {
+                        // Append reason, should be next slot
+                        // Will overwrite appendee, so no need to allocate memory
+                        // Get length
+                        let len := mload(counterBitMap)
+                        // Go to empty byte
+                        let newPos := add(add(counterBitMap, len), 0x20)
+                        // Write slot
+                        mstore(newPos, mload(add(appendee, 0x64)))
+                        // Increment counterBitMap length
+                        mstore(counterBitMap, add(len, 0x20))
+                    }
                 }
 
                 // Increment counter
