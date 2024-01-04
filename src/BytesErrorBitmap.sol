@@ -80,13 +80,32 @@ contract BytesErrorBitmap {
                     let counter := mload(counterPos)
 
                     let aCounter := mload(add(appendee, 0x20))
-                    let aLen := mload(appendee)
+                    let aLen := mload(appendee) // Save in case overridden?
+
+                    // Helper for shifting reasons
+                    function shiftReasons(_counterBitMap, _counter) {
+                        if gt(
+                            mload(_counterBitMap),
+                            add(0x40, mul(div(_counter, 256), 0x20))
+                        ) {
+                            // Loop and shift each reason back one slot
+                            for {
+                                let k := mload(_counterBitMap)
+                            } gt(k, add(0x40, mul(div(_counter, 256), 0x20))) {
+                                k := sub(k, 0x20)
+                            } {
+                                mstore(
+                                    add(_counterBitMap, k),
+                                    mload(add(_counterBitMap, sub(k, 0x20)))
+                                )
+                            }
+                        }
+                    }
 
                     // Append bitmap
                     for {
                         let j := 0x40 // Skip over len + counter
                     } lt(j, add(0x60, mul(div(counter, 256), 0x20))) {
-                        // TODO: Break above down
                         j := add(j, 0x20)
                     } {
                         let nextSlot := add(counterBitMap, 0x40) // Skip len and counter
@@ -105,6 +124,7 @@ contract BytesErrorBitmap {
                                 add(mload(counterBitMap), 0x20)
                             )
                             // TODO: Shift reasons and increment counterBitMap length
+                            shiftReasons(counterBitMap, counter)
                         }
                         default {
                             // Mask and add first part to last slot
@@ -112,17 +132,21 @@ contract BytesErrorBitmap {
                             let mask := shr(counter, mload(add(appendee, j)))
                             // Mask last slot
                             mstore(nextSlot, or(mload(nextSlot), mask))
+
                             // Mask and add remaining part to new slot
-                            // TODO: Shift reasons and increment counterBitMap length
-                            // Go to new slot
-                            let newPos := add(nextSlot, 0x20)
                             // Create mask
                             mask := shl(
                                 sub(256, counter),
                                 mload(add(appendee, j))
                             )
-                            // Write new slot
-                            mstore(nextSlot, mask)
+                            if not(eq(mask, 0)) {
+                                // TODO: Shift reasons and increment counterBitMap length
+                                shiftReasons(counterBitMap, counter)
+                                // Go to new slot
+                                let newPos := add(nextSlot, 0x20)
+                                // Write new slot
+                                mstore(nextSlot, mask)
+                            }
                         }
                         // Update counter
                         counter := add(counter, aCounter)
@@ -152,6 +176,26 @@ contract BytesErrorBitmap {
                 let counterPos := add(counterBitMap, 0x20)
                 let counter := mload(counterPos)
 
+                // Helper for shifting reasons
+                function shiftReasons(_counterBitMap, _counter, skip) {
+                    if gt(
+                        mload(_counterBitMap),
+                        add(skip, mul(div(_counter, 256), 0x20))
+                    ) {
+                        // Loop and shift each reason back one slot
+                        for {
+                            let k := mload(_counterBitMap)
+                        } gt(k, add(skip, mul(div(_counter, 256), 0x20))) {
+                            k := sub(k, 0x20)
+                        } {
+                            mstore(
+                                add(_counterBitMap, k),
+                                mload(add(_counterBitMap, sub(k, 0x20)))
+                            )
+                        }
+                    }
+                }
+
                 switch success
                 case true {
                     // Add 0 to bitmap
@@ -161,23 +205,8 @@ contract BytesErrorBitmap {
                         mstore(0x40, add(mload(0x40), 0x20))
                         // Increment bitmap length
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
-                        // TODO: Shift reasons and increment counterBitMap length
-                        if gt(
-                            mload(counterBitMap),
-                            add(0x40, mul(div(counter, 256), 0x20))
-                        ) {
-                            // Loop and shift each reason back one slot
-                            for {
-                                let j := mload(counterBitMap)
-                            } gt(j, add(0x40, mul(div(counter, 256), 0x20))) {
-                                j := sub(j, 0x20)
-                            } {
-                                mstore(
-                                    add(counterBitMap, j),
-                                    mload(add(counterBitMap, sub(j, 0x20)))
-                                )
-                            }
-                        }
+                        // Shift reasons and increment counterBitMap length
+                        shiftReasons(counterBitMap, counter, 0x40)
                         // Clear slot?
                         mstore(
                             add(
@@ -199,21 +228,8 @@ contract BytesErrorBitmap {
                         // Increment counterBitMap length
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
 
-                        // TODO: Shift reasons and increment counterBitMap length
-                        let emptyLen := add(0x20, mul(div(counter, 256), 0x20))
-                        if gt(mload(counterBitMap), emptyLen) {
-                            // Loop and shift each reason back one slot
-                            for {
-                                let j := mload(counterBitMap)
-                            } gt(j, emptyLen) {
-                                j := sub(j, 0x20)
-                            } {
-                                mstore(
-                                    add(counterBitMap, j),
-                                    mload(add(counterBitMap, sub(j, 0x20)))
-                                )
-                            }
-                        }
+                        // Shift reasons and increment counterBitMap length
+                        shiftReasons(counterBitMap, counter, 0x20)
 
                         // Write 1 to leftmost bit
                         mstore(nextPos, shl(255, 1))

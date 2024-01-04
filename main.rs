@@ -246,8 +246,9 @@ async fn main() -> Result<()> {
 
     // Convert counter and bitmap to u128
     let counter: String = hex::encode(&logs[0].bitmap)[0..64].to_string();
-    let counter = u8::from_str_radix(&counter, 16)?;
-    let bitmap: String = hex::encode(&logs[0].bitmap)[64..].to_string();
+    let counter = u16::from_str_radix(&counter, 16)?;
+    let bitmap_end = (96 + counter / 256 * 32) as usize;
+    let bitmap: String = hex::encode(&logs[0].bitmap)[64..bitmap_end].to_string();
     let bitmap = U256::from_str_radix(&bitmap, 16)?;
 
     println!("Counter: {}", counter);
@@ -295,12 +296,12 @@ enum BoxedWithResult {
 
 fn decode_bitmap(
     execs: Vec<Box<ExecBoxed>>,
-    counter: u8,
+    counter: u16,
     bitmap: U256,
-    i: u8,
-) -> (Vec<Box<BoxedWithResult>>, u8) {
+    i: u16,
+) -> (Vec<Box<BoxedWithResult>>, u16) {
     // println!("execs: {}", serde_json::to_string_pretty(&execs).unwrap());
-    let mut _i: u8 = i;
+    let mut _i: u16 = i;
     let mut reverted: bool = false;
     let mut _execs: Vec<Box<BoxedWithResult>> = execs
         .into_iter()
