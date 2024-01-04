@@ -91,33 +91,34 @@ contract BytesErrorBitmap {
             ) {
                 isBatch = true;
             }
+
             assembly {
+                // Helper for shifting reasons
+                function shiftReasons(_counterBitMap, _counter, skip) {
+                    if gt(
+                        mload(_counterBitMap),
+                        add(skip, mul(div(_counter, 256), 0x20))
+                    ) {
+                        // Loop and shift each reason back one slot
+                        for {
+                            let k := mload(_counterBitMap)
+                        } gt(k, add(skip, mul(div(_counter, 256), 0x20))) {
+                            k := sub(k, 0x20)
+                        } {
+                            mstore(
+                                add(_counterBitMap, k),
+                                mload(add(_counterBitMap, sub(k, 0x20)))
+                            )
+                        }
+                    }
+                }
+
                 if isBatch {
                     let counterPos := add(counterBitMap, 0x20)
                     let counter := mload(counterPos)
 
                     let aCounter := mload(add(appendee, 0x20))
                     let aLen := mload(appendee) // Save in case overridden?
-
-                    // Helper for shifting reasons
-                    function shiftReasons(_counterBitMap, _counter) {
-                        if gt(
-                            mload(_counterBitMap),
-                            add(0x40, mul(div(_counter, 256), 0x20))
-                        ) {
-                            // Loop and shift each reason back one slot
-                            for {
-                                let k := mload(_counterBitMap)
-                            } gt(k, add(0x40, mul(div(_counter, 256), 0x20))) {
-                                k := sub(k, 0x20)
-                            } {
-                                mstore(
-                                    add(_counterBitMap, k),
-                                    mload(add(_counterBitMap, sub(k, 0x20)))
-                                )
-                            }
-                        }
-                    }
 
                     // Append bitmap
                     for {
@@ -141,7 +142,7 @@ contract BytesErrorBitmap {
                                 add(mload(counterBitMap), 0x20)
                             )
                             // TODO: Shift reasons and increment counterBitMap length
-                            shiftReasons(counterBitMap, counter)
+                            shiftReasons(counterBitMap, counter, 0x40)
                         }
                         default {
                             // Mask and add first part to last slot
@@ -158,7 +159,7 @@ contract BytesErrorBitmap {
                             )
                             if not(eq(mask, 0)) {
                                 // TODO: Shift reasons and increment counterBitMap length
-                                shiftReasons(counterBitMap, counter)
+                                shiftReasons(counterBitMap, counter, 0x40)
                                 // Go to new slot
                                 let newPos := add(nextSlot, 0x20)
                                 // Write new slot
@@ -186,32 +187,10 @@ contract BytesErrorBitmap {
                         )
                     }
                 }
-            }
 
-            // Add this tx's bit to bitmap
-            assembly {
+                // Add this tx's bit to bitmap
                 let counterPos := add(counterBitMap, 0x20)
                 let counter := mload(counterPos)
-
-                // Helper for shifting reasons
-                function shiftReasons(_counterBitMap, _counter, skip) {
-                    if gt(
-                        mload(_counterBitMap),
-                        add(skip, mul(div(_counter, 256), 0x20))
-                    ) {
-                        // Loop and shift each reason back one slot
-                        for {
-                            let k := mload(_counterBitMap)
-                        } gt(k, add(skip, mul(div(_counter, 256), 0x20))) {
-                            k := sub(k, 0x20)
-                        } {
-                            mstore(
-                                add(_counterBitMap, k),
-                                mload(add(_counterBitMap, sub(k, 0x20)))
-                            )
-                        }
-                    }
-                }
 
                 switch success
                 case true {
