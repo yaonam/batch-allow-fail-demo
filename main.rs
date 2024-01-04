@@ -366,12 +366,19 @@ fn decode_bitmap(
                         }, // if reverted, set rest to fail
                         revert_reason: {
                             if (reverted && !skip) || (!reverted && failed) {
-                                println!("hallo");
                                 // Exec that caused revert
                                 let mut chars: Vec<char> = reasons.chars().collect();
                                 let reason: Vec<char> = chars.drain(..64).collect();
                                 reasons = chars.into_iter().collect();
-                                reason.into_iter().collect()
+                                // reason.into_iter().collect()
+
+                                let reason: String = reason
+                                    .into_iter()
+                                    .collect::<String>()
+                                    .trim_end_matches('0')
+                                    .to_string();
+                                let reason_bytes = hex::decode(reason).unwrap();
+                                String::from_utf8(reason_bytes).unwrap()
                             } else {
                                 "".to_string()
                             }
