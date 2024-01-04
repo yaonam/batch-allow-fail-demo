@@ -26,10 +26,22 @@ contract Callee {
 contract BytesErrorBitmap {
     event BitmapError(bytes bitmap);
 
+    modifier onlySelf() {
+        require(msg.sender == address(this), "only self");
+        _;
+    }
+
     function batchExeAllowFail(
         AllowFailedExecution[] calldata allowFailExecs
     ) external returns (bytes memory result) {
-        result = _batchExeAllowFail(allowFailExecs);
+        // result = _batchExeAllowFail(allowFailExecs);
+        try this._batchExeAllowFail(allowFailExecs) returns (bytes memory r) {
+            result = r;
+        } catch (bytes memory reason) {
+            assembly {
+                revert(add(reason, 0x20), mload(reason))
+            }
+        }
 
         emit BitmapError(result);
     }
@@ -41,7 +53,7 @@ contract BytesErrorBitmap {
      */
     function _batchExeAllowFail(
         AllowFailedExecution[] calldata allowFailExecs
-    ) public returns (bytes memory) {
+    ) public onlySelf returns (bytes memory) {
         uint256 execsLen = allowFailExecs.length;
         bool shouldRevert;
         bool success;
@@ -251,14 +263,14 @@ contract BytesErrorBitmap {
                     mstore(newPos, mload(add(appendee, 0x64)))
                     // Increment counterBitMap length
                     mstore(counterBitMap, add(len, 0x20))
-
-                    if shouldRevert {
-                        revert(add(counterBitMap, 0x20), mload(counterBitMap))
-                    }
                 }
 
                 // Increment counter
                 mstore(counterPos, add(counter, 1))
+
+                if shouldRevert {
+                    revert(add(counterBitMap, 0x20), mload(counterBitMap))
+                }
             }
         }
 

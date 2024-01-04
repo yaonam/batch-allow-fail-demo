@@ -52,6 +52,19 @@ contract BytesErrorBitmapTest is Test {
         );
     }
 
+    function test_Revert() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
+        execs[0] = AllowFailedExecution(execFail, false, Operation.Call);
+        try bitmap.batchExeAllowFail(execs) {
+            revert("should revert");
+        } catch (bytes memory reason) {
+            assertEq(
+                reason,
+                hex"0000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+            );
+        }
+    }
+
     function test_FailFail() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](2);
         execs[0] = AllowFailedExecution(execFail, true, Operation.Call);
