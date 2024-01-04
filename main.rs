@@ -34,31 +34,31 @@ enum ExecBoxed {
 fn get_exec_tree() -> Vec<Box<ExecBoxed>> {
     // CREATE EXECUTION TREE HERE ----------------------------------------------
     let execs = vec![
-        // Box::new(ExecBoxed::Batch {
-        //     batch: Batch {
-        //         execs: vec![
-        //             Box::new(ExecBoxed::Exec {
-        //                 exec: Exec {
-        //                     fail: false,
-        //                     allow_fail: true,
-        //                 },
-        //             }),
-        //             Box::new(ExecBoxed::Exec {
-        //                 exec: Exec {
-        //                     fail: true,
-        //                     allow_fail: false,
-        //                 },
-        //             }),
-        //             Box::new(ExecBoxed::Exec {
-        //                 exec: Exec {
-        //                     fail: true,
-        //                     allow_fail: false,
-        //                 },
-        //             }),
-        //         ],
-        //         allow_fail: true,
-        //     },
-        // }),
+        Box::new(ExecBoxed::Batch {
+            batch: Batch {
+                execs: vec![
+                    Box::new(ExecBoxed::Exec {
+                        exec: Exec {
+                            fail: false,
+                            allow_fail: true,
+                        },
+                    }),
+                    Box::new(ExecBoxed::Exec {
+                        exec: Exec {
+                            fail: true,
+                            allow_fail: false,
+                        },
+                    }),
+                    Box::new(ExecBoxed::Exec {
+                        exec: Exec {
+                            fail: true,
+                            allow_fail: false,
+                        },
+                    }),
+                ],
+                allow_fail: true,
+            },
+        }),
         Box::new(ExecBoxed::Batch {
             batch: Batch {
                 execs: vec![

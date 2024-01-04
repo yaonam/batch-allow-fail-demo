@@ -149,7 +149,10 @@ contract BytesErrorBitmap {
                             // Create mask
                             let mask := shr(counter, mload(add(appendee, j)))
                             // Mask last slot
-                            mstore(nextSlot, or(mload(nextSlot), mask))
+                            mstore(
+                                sub(nextSlot, 0x20),
+                                or(mload(sub(nextSlot, 0x20)), mask)
+                            )
 
                             // Mask and add remaining part to new slot
                             // Create mask
@@ -157,7 +160,7 @@ contract BytesErrorBitmap {
                                 sub(256, counter),
                                 mload(add(appendee, j))
                             )
-                            if not(eq(mask, 0)) {
+                            if gt(mask, 0) {
                                 // Shift reasons
                                 shiftReasons(counterBitMap, counter, 0x40)
                                 // Go to new slot
