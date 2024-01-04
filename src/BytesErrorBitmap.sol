@@ -113,10 +113,10 @@ contract BytesErrorBitmap {
                     }
                 }
 
-                if isBatch {
-                    let counterPos := add(counterBitMap, 0x20)
-                    let counter := mload(counterPos)
+                let counterPos := add(counterBitMap, 0x20)
+                let counter := mload(counterPos)
 
+                if isBatch {
                     let aCounter := mload(add(appendee, 0x20))
                     let aLen := mload(appendee) // Save in case overridden?
 
@@ -141,7 +141,7 @@ contract BytesErrorBitmap {
                                 counterBitMap,
                                 add(mload(counterBitMap), 0x20)
                             )
-                            // TODO: Shift reasons and increment counterBitMap length
+                            // Shift reasons
                             shiftReasons(counterBitMap, counter, 0x40)
                         }
                         default {
@@ -158,7 +158,7 @@ contract BytesErrorBitmap {
                                 mload(add(appendee, j))
                             )
                             if not(eq(mask, 0)) {
-                                // TODO: Shift reasons and increment counterBitMap length
+                                // Shift reasons
                                 shiftReasons(counterBitMap, counter, 0x40)
                                 // Go to new slot
                                 let newPos := add(nextSlot, 0x20)
@@ -189,9 +189,6 @@ contract BytesErrorBitmap {
                 }
 
                 // Add this tx's bit to bitmap
-                let counterPos := add(counterBitMap, 0x20)
-                let counter := mload(counterPos)
-
                 switch success
                 case true {
                     // Add 0 to bitmap
@@ -201,7 +198,7 @@ contract BytesErrorBitmap {
                         mstore(0x40, add(mload(0x40), 0x20))
                         // Increment bitmap length
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
-                        // Shift reasons and increment counterBitMap length
+                        // Shift reasons
                         shiftReasons(counterBitMap, counter, 0x40)
                         // Clear slot?
                         mstore(
@@ -224,7 +221,7 @@ contract BytesErrorBitmap {
                         // Increment counterBitMap length
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
 
-                        // Shift reasons and increment counterBitMap length
+                        // Shift reasons
                         shiftReasons(counterBitMap, counter, 0x20)
 
                         // Write 1 to leftmost bit
@@ -237,7 +234,7 @@ contract BytesErrorBitmap {
                         mstore(nextPos, or(mload(nextPos), mask))
                     }
 
-                    if not(isBatch) {
+                    if eq(isBatch, false) {
                         // Append reason, should be next slot
                         // Will overwrite appendee, so no need to allocate memory
                         // Get length
