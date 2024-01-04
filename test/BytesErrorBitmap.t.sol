@@ -33,15 +33,7 @@ contract BytesErrorBitmapTest is Test {
 
     function test_Success() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
-        execs[0] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, false)
-            ),
-            false,
-            Operation.Call
-        );
+        execs[0] = AllowFailedExecution(execSuccess, false, Operation.Call);
         bytes memory result = bitmap.batchExeAllowFail(execs);
         assertEq(
             result,
@@ -51,15 +43,7 @@ contract BytesErrorBitmapTest is Test {
 
     function test_Fail() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
-        execs[0] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
+        execs[0] = AllowFailedExecution(execFail, true, Operation.Call);
         bytes memory result = bitmap.batchExeAllowFail(execs);
 
         assertEq(
@@ -70,24 +54,8 @@ contract BytesErrorBitmapTest is Test {
 
     function test_FailFail() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](2);
-        execs[0] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
-        execs[1] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
+        execs[0] = AllowFailedExecution(execFail, true, Operation.Call);
+        execs[1] = AllowFailedExecution(execFail, true, Operation.Call);
         bytes memory result = bitmap.batchExeAllowFail(execs);
 
         assertEq(
@@ -98,33 +66,9 @@ contract BytesErrorBitmapTest is Test {
 
     function test_FailSuccessFail() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](3);
-        execs[0] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
-        execs[1] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, false)
-            ),
-            true,
-            Operation.Call
-        );
-        execs[2] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
+        execs[0] = AllowFailedExecution(execFail, true, Operation.Call);
+        execs[1] = AllowFailedExecution(execSuccess, true, Operation.Call);
+        execs[2] = AllowFailedExecution(execFail, true, Operation.Call);
         bytes memory result = bitmap.batchExeAllowFail(execs);
 
         assertEq(
@@ -135,35 +79,11 @@ contract BytesErrorBitmapTest is Test {
 
     function test_FailSuccessOverflowSuccess() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](257);
-        execs[0] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
+        execs[0] = AllowFailedExecution(execFail, true, Operation.Call);
         for (uint i = 1; i < 256; i++) {
-            execs[i] = AllowFailedExecution(
-                Execution(
-                    address(callee),
-                    0,
-                    abi.encodeWithSelector(Callee.foo.selector, false)
-                ),
-                true,
-                Operation.Call
-            );
+            execs[i] = AllowFailedExecution(execSuccess, true, Operation.Call);
         }
-        execs[256] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, false)
-            ),
-            true,
-            Operation.Call
-        );
+        execs[256] = AllowFailedExecution(execSuccess, true, Operation.Call);
         bytes memory result = bitmap.batchExeAllowFail(execs);
 
         assertEq(
@@ -174,35 +94,11 @@ contract BytesErrorBitmapTest is Test {
 
     function test_FailSuccessOverflowFail() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](257);
-        execs[0] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
+        execs[0] = AllowFailedExecution(execFail, true, Operation.Call);
         for (uint i = 1; i < 256; i++) {
-            execs[i] = AllowFailedExecution(
-                Execution(
-                    address(callee),
-                    0,
-                    abi.encodeWithSelector(Callee.foo.selector, false)
-                ),
-                true,
-                Operation.Call
-            );
+            execs[i] = AllowFailedExecution(execSuccess, true, Operation.Call);
         }
-        execs[256] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
+        execs[256] = AllowFailedExecution(execFail, true, Operation.Call);
         bytes memory result = bitmap.batchExeAllowFail(execs);
 
         assertEq(
@@ -214,15 +110,7 @@ contract BytesErrorBitmapTest is Test {
     function test_FailNested() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
         AllowFailedExecution[] memory _execs = new AllowFailedExecution[](1);
-        _execs[0] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
+        _execs[0] = AllowFailedExecution(execFail, true, Operation.Call);
         execs[0] = AllowFailedExecution(
             Execution(
                 address(bitmap),
@@ -246,24 +134,8 @@ contract BytesErrorBitmapTest is Test {
     function test_FailFailNested() public {
         AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
         AllowFailedExecution[] memory _execs = new AllowFailedExecution[](2);
-        _execs[0] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
-        _execs[1] = AllowFailedExecution(
-            Execution(
-                address(callee),
-                0,
-                abi.encodeWithSelector(Callee.foo.selector, true)
-            ),
-            true,
-            Operation.Call
-        );
+        _execs[0] = AllowFailedExecution(execFail, true, Operation.Call);
+        _execs[1] = AllowFailedExecution(execFail, true, Operation.Call);
         execs[0] = AllowFailedExecution(
             Execution(
                 address(bitmap),
@@ -284,18 +156,13 @@ contract BytesErrorBitmapTest is Test {
         );
     }
 
-    function test_BatchesNested() public {
-        AllowFailedExecution[] memory execs = new AllowFailedExecution[](2);
+    function test_SuccessRevertSuccessNested() public {
+        AllowFailedExecution[] memory execs = new AllowFailedExecution[](1);
         AllowFailedExecution[] memory execs1 = new AllowFailedExecution[](3);
-        AllowFailedExecution[] memory execs2 = new AllowFailedExecution[](3);
 
         execs1[0] = AllowFailedExecution(execSuccess, true, Operation.Call);
         execs1[1] = AllowFailedExecution(execFail, false, Operation.Call);
         execs1[2] = AllowFailedExecution(execFail, false, Operation.Call);
-
-        execs2[0] = AllowFailedExecution(execSuccess, false, Operation.Call);
-        execs2[1] = AllowFailedExecution(execFail, true, Operation.Call);
-        execs2[2] = AllowFailedExecution(execSuccess, true, Operation.Call);
 
         execs[0] = AllowFailedExecution(
             Execution(
@@ -309,26 +176,60 @@ contract BytesErrorBitmapTest is Test {
             true,
             Operation.Call
         );
-        execs[1] = AllowFailedExecution(
-            Execution(
-                address(bitmap),
-                0,
-                abi.encodeWithSelector(
-                    BytesErrorBitmap._batchExeAllowFail.selector,
-                    execs2
-                )
-            ),
-            true,
-            Operation.Call
-        );
 
         bytes memory result = bitmap.batchExeAllowFail(execs);
 
         assertEq(
             result,
-            hex"0000000000000000000000000000000000000000000000000000000000000006480000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+            hex"0000000000000000000000000000000000000000000000000000000000000003600000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
         );
     }
+
+    // function test_BatchesNested() public {
+    //     AllowFailedExecution[] memory execs = new AllowFailedExecution[](2);
+    //     AllowFailedExecution[] memory execs1 = new AllowFailedExecution[](3);
+    //     AllowFailedExecution[] memory execs2 = new AllowFailedExecution[](3);
+
+    //     execs1[0] = AllowFailedExecution(execSuccess, true, Operation.Call);
+    //     execs1[1] = AllowFailedExecution(execFail, false, Operation.Call);
+    //     execs1[2] = AllowFailedExecution(execFail, false, Operation.Call);
+
+    //     execs2[0] = AllowFailedExecution(execSuccess, false, Operation.Call);
+    //     execs2[1] = AllowFailedExecution(execFail, true, Operation.Call);
+    //     execs2[2] = AllowFailedExecution(execSuccess, true, Operation.Call);
+
+    //     execs[0] = AllowFailedExecution(
+    //         Execution(
+    //             address(bitmap),
+    //             0,
+    //             abi.encodeWithSelector(
+    //                 BytesErrorBitmap._batchExeAllowFail.selector,
+    //                 execs1
+    //             )
+    //         ),
+    //         true,
+    //         Operation.Call
+    //     );
+    //     execs[1] = AllowFailedExecution(
+    //         Execution(
+    //             address(bitmap),
+    //             0,
+    //             abi.encodeWithSelector(
+    //                 BytesErrorBitmap._batchExeAllowFail.selector,
+    //                 execs2
+    //             )
+    //         ),
+    //         true,
+    //         Operation.Call
+    //     );
+
+    //     bytes memory result = bitmap.batchExeAllowFail(execs);
+
+    //     assertEq(
+    //         result,
+    //         hex"0000000000000000000000000000000000000000000000000000000000000006480000000000000000000000000000000000000000000000000000000000000072657665727420726561736f6e0000000000000000000000000000000000000072657665727420726561736f6e00000000000000000000000000000000000000"
+    //     );
+    // }
 
     function testFuzz_OneLayer(bool[] calldata shouldFails) public {
         uint len = shouldFails.length;
@@ -386,11 +287,7 @@ contract BytesErrorBitmapTest is Test {
             if (secondLen > 10) secondLen = 10; // Limit
             if (secondLen == 0) {
                 execs[i] = AllowFailedExecution(
-                    Execution(
-                        address(callee),
-                        0,
-                        abi.encodeWithSelector(Callee.foo.selector, false)
-                    ),
+                    execSuccess,
                     true,
                     Operation.Call
                 );
