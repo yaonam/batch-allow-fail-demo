@@ -220,7 +220,7 @@ contract BytesErrorBitmap {
                     switch mod(counter, 256)
                     case 0 {
                         // Increment 0x40 memory pointer
-                        mstore(0x40, add(mload(0x40), 0x20))
+                        // mstore(0x40, add(mload(0x40), 0x20))
                         // Increment counterBitMap length
                         mstore(counterBitMap, add(mload(counterBitMap), 0x20))
 

@@ -244,6 +244,8 @@ contract BytesErrorBitmapTest is Test {
         );
     }
 
+    function test_NestedOverflow() public {}
+
     function testFuzz_OneLayer(bool[] calldata shouldFails) public {
         uint len = shouldFails.length;
         uint expectLen = len > 0 ? 2 : 1;
